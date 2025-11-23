@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Windows 98349453789759375947987984574987497545</title>
+    <style>
+        /* --- 系统核心样式 --- */
+        :root {
+            --bg-color: #008080;
+            --win-gray: #c0c0c0;
+            --win-dark: #808080;
+            --win-light: #ffffff;
+            --win-blue: #000080;
+            --text-color: #000000;
+        }
+
+        * { box-sizing: border-box; user-select: none; }
+        body {
+            margin: 0; padding: 0;
+            font-family: 'SimSun', '宋体', sans-serif;
+            background-color: var(--bg-color);
+            overflow: hidden;
+            height: 100vh;
+            cursor: default;
+        }
+
+        /* --- 开机动画 --- */
+        #boot-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; color: #fff; z-index: 99999;
+            display: flex; flex-direction: column; padding: 20px;
+            font-family: 'Courier New', monospace;
+        }
+        .boot-logo { font-size: 40px; font-weight: bold; margin-bottom: 20px; color: #00ff00; }
+        .boot-text { font-size: 14px; line-height: 1.5; }
+        .progress-container { margin-top: auto; width: 100%; border: 2px solid #fff; height: 30px; padding: 2px;}
+        .progress-bar { height: 100%; background: #fff; width: 0%; transition: width 0.2s; }
+
+        /* --- 蓝屏死机 (BSOD) --- */
+        #bsod {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #0000AA; color: #fff; z-index: 100000;
+            padding: 100px; font-family: 'Courier New', monospace;
+            font-size: 20px; line-height: 1.5;
+        }
+
+        /* --- 桌面图标 --- */
+        #desktop { display: flex; flex-direction: column; flex-wrap: wrap; height: calc(100% - 30px); padding: 10px; align-content: flex-start; }
+        .icon {
+            width: 80px; text-align: center; margin: 10px; cursor: pointer;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .icon:active .icon-img { filter: invert(0.5); }
+        .icon-img { width: 32px; height: 32px; margin-bottom: 5px; image-rendering: pixelated; }
+        /* 简单的纯CSS图标绘制 */
+        .ico-pc { background: conic-gradient(from 180deg at 50% 50%, #ccc 0deg, #fff 90deg, #888 180deg); border: 2px solid #000; }
+        .ico-txt { background: #fff; border: 1px solid #000; position: relative; }
+        .ico-txt::after { content: '---'; color: #000; position: absolute; top: 5px; left: 5px; }
+        .ico-cmd { background: #000; border-top: 5px solid #ccc; }
+        .ico-paint { background: linear-gradient(45deg, red, blue, yellow); border-radius: 50%; }
+        .ico-game { background: #0f0; border: 2px dashed #000; }
+        .ico-code { background: #2d2d2d; color: #0f0; display:grid; place-items:center; font-size:10px; }
+        .ico-video { background: #purple; border: 2px double #fff; position:relative;}
+        .ico-video::before {content:'▶'; color:white; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);}
+        
+        .icon-text { color: white; text-shadow: 1px 1px 0 #000; font-size: 12px; padding: 2px; }
+        .icon.selected .icon-text { background: var(--win-blue); outline: 1px dotted #fff; }
+
+        /* --- 窗口系统 --- */
+        .window {
+            position: absolute; background: var(--win-gray);
+            border-top: 2px solid #fff; border-left: 2px solid #fff;
+            border-right: 2px solid #000; border-bottom: 2px solid #000;
+            box-shadow: 2px 2px 0 #000;
+            display: flex; flex-direction: column;
+            min-width: 200px; min-height: 150px;
+        }
+        .title-bar {
+            background: var(--win-blue); padding: 2px 4px; display: flex; justify-content: space-between; align-items: center;
+            color: white; font-weight: bold; cursor: default;
+        }
+        .title-bar.inactive { background: var(--win-dark); }
+        .controls button {
+            width: 16px; height: 14px; font-size: 10px; line-height: 10px;
+            background: var(--win-gray); border: 1px outset #fff; cursor: pointer; margin-left: 2px; padding: 0;
+        }
+        .controls button:active { border: 1px inset #fff; }
+        .window-body { flex: 1; padding: 2px; overflow: hidden; position: relative; display: flex; flex-direction: column;}
+        .menu-bar { display: flex; padding: 2px; border-bottom: 1px solid #888; margin-bottom: 2px; font-size: 12px;}
+        .menu-item { margin-right: 10px; cursor: pointer; }
+        .menu-item:hover { background: var(--win-blue); color: white; }
+
+        /* --- 任务栏 --- */
+        #taskbar {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 28px;
+            background: var(--win-gray); border-top: 2px solid #fff;
+            display: flex; align-items: center; padding: 2px; z-index: 9999;
+        }
+        #start-btn {
+            display: flex; align-items: center; padding: 2px 6px; font-weight: bold;
+            border: 2px outset #fff; cursor: pointer; margin-right: 5px;
+        }
+        #start-btn:active, #start-btn.active { border: 2px inset #fff; }
+        #start-btn img { width: 16px; height: 16px; margin-right: 4px; background: black;} 
+        
+        #task-list { flex: 1; display: flex; overflow: hidden; }
+        .task-item {
+            width: 150px; border: 2px outset #fff; margin-right: 2px; padding: 3px;
+            font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
+            background: var(--win-gray);
+        }
+        .task-item.active { border: 2px inset #fff; background: #eee; font-weight: bold;}
+        
+        #tray {
+            border: 2px inset #fff; padding: 2px 10px; font-size: 12px; margin-left: auto;
+            background: var(--win-gray); display: flex; align-items: center;
+        }
+
+        /* --- 开始菜单 --- */
+        #start-menu {
+            position: fixed; bottom: 28px; left: 2px; width: 200px;
+            background: var(--win-gray); border: 2px outset #fff;
+            display: none; z-index: 10000;
+        }
+        .start-side {
+            width: 25px; background: var(--win-blue); color: white;
+            writing-mode: vertical-lr; transform: rotate(180deg);
+            text-align: center; padding: 5px; font-weight: bold; font-size: 16px;
+        }
+        .start-content { flex: 1; display: flex; flex-direction: column; }
+        .start-item {
+            padding: 8px 10px; cursor: pointer; display: flex; align-items: center; font-size: 12px;
+            border-bottom: 1px solid transparent; border-top: 1px solid transparent;
+        }
+        .start-item:hover { background: var(--win-blue); color: white; }
+        .start-line { height: 2px; border-top: 1px solid #888; border-bottom: 1px solid #fff; margin: 2px 0; }
+
+        /* --- 应用特定样式 --- */
+        /* Terminal */
+        .cmd-content { background: #000; color: #ccc; font-family: monospace; padding: 5px; height: 100%; overflow-y: auto; user-select: text; }
+        .cmd-input { background: transparent; border: none; color: #ccc; width: 100%; outline: none; font-family: monospace; }
+        
+        /* Notepad */
+        textarea.notepad-area { width: 100%; height: 100%; resize: none; border: none; outline: none; font-family: 'SimSun', monospace; padding: 5px; font-size: 14px;}
+        
+        /* Code Editor */
+        .code-area { background: #1e1e1e; color: #d4d4d4; font-family: 'Consolas', monospace; width: 100%; height: 100%; padding: 10px; overflow: auto; white-space: pre; outline:none; border:none; resize:none;}
+        
+        /* Paint */
+        .paint-tools { background: var(--win-gray); padding: 5px; display: flex; gap: 5px; border-bottom: 1px solid #888; }
+        .color-box { width: 20px; height: 20px; border: 1px solid #000; cursor: pointer; }
+        canvas.paint-canvas { background: #fff; cursor: crosshair; display: block; }
+
+        /* Game (Snake) */
+        .snake-game-container { background: #99b; display: flex; justify-content: center; align-items: center; height: 100%; flex-direction: column;}
+        #snake-canvas { border: 4px inset #555; background: #000; }
+        .score-board { font-family: 'Courier New'; font-weight: bold; margin-bottom: 5px; }
+
+        /* Video Editor */
+        .video-editor { display: flex; flex-direction: column; height: 100%; background: #444; }
+        .video-preview { height: 60%; background: #000; position: relative; display: flex; justify-content: center; align-items: center; overflow: hidden;}
+        .timeline { flex: 1; background: #333; border-top: 2px solid #000; padding: 10px; overflow-x: auto; white-space: nowrap;}
+        .clip { display: inline-block; width: 80px; height: 40px; background: #666; margin-right: 2px; border: 1px solid #888; cursor: pointer; text-align: center; color: #fff; font-size: 10px; padding-top: 12px;}
+        .clip:hover { background: #888; }
+        .play-btn { width: 100%; padding: 5px; background: var(--win-gray); border: 1px outset #fff; cursor: pointer;}
+
+    </style>
+</head>
+<body>
+
+    <!-- 蓝屏 -->
+    <div id="bsod">
+        <p>A problem has been detected and Windows has been shut down to prevent damage to your computer.</p>
+        <p>ERROR_CODE: 0x00000DEAD</p>
+        <p>DRIVER_IRQL_NOT_LESS_OR_EQUAL</p>
+        <br>
+        <p>If this is the first time you've seen this stop error screen, restart your computer. If this screen appears again, follow these steps:</p>
+        <p>Check to make sure any new hardware or software is properly installed.</p>
+        <br>
+        <p>Press F5 to Reboot (Click here to reboot)</p>
+    </div>
+
+    <!-- 开机画面 -->
+    <div id="boot-screen">
+        <div class="boot-logo">Energy Star Bios</div>
+        <div class="boot-text">
+            BIOS Date 01/01/98 14:22:51 Ver: 1.0.0<br>
+            CPU: INTEL PENTIUM II 300MHZ<br>
+            Memory Test: 645379K OK<br><br>
+            Detecting IDE Primary Master ... WDC AC24300L<br>
+            Detecting IDE Primary Slave  ... None<br>
+            Detecting IDE Secondary Master ... CD-ROM 32X<br><br>
+            Booting from C:\windows...
+        </div>
+        <div class="progress-container">
+            <div class="progress-bar" id="boot-bar"></div>
+        </div>
+    </div>
+
+    <!-- 桌面环境 -->
+    <div id="desktop">
+        <!-- 图标由JS生成 -->
+    </div>
+
+    <!-- 任务栏 -->
+    <div id="taskbar">
+        <div id="start-btn">
+            <div style="width:14px; height:14px; background: conic-gradient(from 180deg at 50% 50%, red 0deg, green 90deg, blue 180deg, yellow 270deg); margin-right:4px; border:1px solid black;"></div>
+            开始
+        </div>
+        <div style="width: 2px; height: 20px; border-left: 1px solid #888; border-right: 1px solid #fff; margin: 0 5px;"></div>
+        <div id="task-list"></div>
+        <div style="width: 2px; height: 20px; border-left: 1px solid #888; border-right: 1px solid #fff; margin: 0 5px;"></div>
+        <div id="tray">
+            <span id="clock">12:00</span>
+        </div>
+    </div>
+
+    <!-- 开始菜单 -->
+    <div id="start-menu" style="display:flex; flex-direction:row;">
+        <div class="start-side">WINDOWS 9834...</div>
+        <div class="start-content">
+            <div class="start-item" onclick="openApp('notepad')">📝 记事本</div>
+            <div class="start-item" onclick="openApp('paint')">🎨 画图</div>
+            <div class="start-item" onclick="openApp('cmd')">💻 命令提示符</div>
+            <div class="start-item" onclick="openApp('code')">💾 代码编辑器</div>
+            <div class="start-item" onclick="openApp('explorer')">📁 我的电脑</div>
+            <div class="start-item" onclick="openApp('game')">🐍 贪吃蛇</div>
+            <div class="start-item" onclick="openApp('video')">🎬 视频制作</div>
+            <div class="start-line"></div>
+            <div class="start-item" onclick="alert('无法关闭计算机。此计算机现在是安全的。')">🔴 关闭系统</div>
+        </div>
+    </div>
+
+<script>
+    /* --- 系统全局变量 --- */
+    let zIndexCounter = 100;
+    let windowCount = 0;
+    const windows = {};
+    const desktop = document.getElementById('desktop');
+    const taskList = document.getElementById('task-list');
+
+    /* --- 开机逻辑 --- */
+    window.onload = function() {
+        const bootBar = document.getElementById('boot-bar');
+        let width = 0;
+        const interval = setInterval(() => {
+            width += Math.random() * 5;
+            if (width > 100) width = 100;
+            bootBar.style.width = width + '%';
+            if (width === 100) {
+                clearInterval(interval);
+                playBootSound();
+                setTimeout(() => {
+                    document.getElementById('boot-screen').style.display = 'none';
+                    initDesktop();
+                }, 800);
+            }
+        }, 50);
+    };
+
+    function playBootSound() {
+        try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            const ctx = new AudioContext();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(220, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1);
+            osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 2);
+            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 3);
+            osc.start();
+            osc.stop(ctx.currentTime + 3);
+        } catch(e) { console.log('Audio blocked'); }
+    }
+
+    /* --- 桌面与图标 --- */
+    const apps = {
+        'explorer': { title: '我的电脑', icon: 'ico-pc', content: createExplorer },
+        'notepad': { title: '新建文本文档.txt', icon: 'ico-txt', content: createNotepad },
+        'cmd': { title: 'MS-DOS 提示符', icon: 'ico-cmd', content: createCMD },
+        'paint': { title: '画图', icon: 'ico-paint', content: createPaint },
+        'code': { title: 'Code Studio', icon: 'ico-code', content: createCodeEditor },
+        'game': { title: '贪吃蛇', icon: 'ico-game', content: createSnake },
+        'video': { title: 'ClipMaker 2000', icon: 'ico-video', content: createVideoEditor }
+    };
+
+    function initDesktop() {
+        for (let key in apps) {
+            const el = document.createElement('div');
+            el.className = 'icon';
+            el.innerHTML = `<div class="icon-img ${apps[key].icon}"></div><div class="icon-text">${apps[key].title}</div>`;
+            el.ondblclick = () => openApp(key);
+            el.onclick = () => {
+                document.querySelectorAll('.icon').forEach(i => i.classList.remove('selected'));
+                el.classList.add('selected');
+            };
+            desktop.appendChild(el);
+        }
+        updateClock();
+        setInterval(updateClock, 1000);
+    }
+
+    /* --- 窗口管理器 --- */
+    function openApp(appKey) {
+        const app = apps[appKey];
+        createWindow(app.title, appKey, app.content);
+        toggleStartMenu(false);
+    }
+
+    function createWindow(title, type, contentFunc) {
+        const id = 'win-' + Date.now();
+        const win = document.createElement('div');
+        win.className = 'window';
+        win.id = id;
+        win.style.left = (50 + windowCount * 20) + 'px';
+        win.style.top = (50 + windowCount * 20) + 'px';
+        win.style.zIndex = ++zIndexCounter;
+        win.style.width = type === 'paint' || type === 'video' ? '500px' : '400px';
+        win.style.height = type === 'paint' || type === 'video' ? '400px' : '300px';
+
+        const bodyContent = contentFunc(id);
+
+        win.innerHTML = `
+            <div class="title-bar" onmousedown="startDrag(event, '${id}')">
+                <div class="title-text"><span style="margin-right:5px;">💻</span>${title}</div>
+                <div class="controls">
+                    <button onclick="minimizeWindow('${id}')">_</button>
+                    <button onclick="maximizeWindow('${id}')">□</button>
+                    <button onclick="closeWindow('${id}')">X</button>
+                </div>
+            </div>
+            <div class="menu-bar">
+                <div class="menu-item">文件(F)</div>
+                <div class="menu-item">编辑(E)</div>
+                <div class="menu-item">查看(V)</div>
+                <div class="menu-item">帮助(H)</div>
+            </div>
+            <div class="window-body">${bodyContent}</div>
+        `;
+
+        win.onmousedown = () => focusWindow(id);
+        desktop.appendChild(win);
+        windows[id] = { element: win, taskBtn: createTaskbarItem(id, title) };
+        windowCount++;
+        
+        // 初始化特定的应用逻辑
+        if(type === 'paint') initPaint(id);
+        if(type === 'cmd') initCMD(id);
+        if(type === 'game') initSnake(id);
+        if(type === 'video') initVideo(id);
+    }
+
+    function closeWindow(id) {
+        const win = windows[id];
+        if (win) {
+            win.element.remove();
+            win.taskBtn.remove();
+            delete windows[id];
+        }
+    }
+
+    function minimizeWindow(id) {
+        windows[id].element.style.display = 'none';
+        windows[id].taskBtn.classList.remove('active');
+    }
+
+    function focusWindow(id) {
+        if(windows[id].element.style.display === 'none') {
+            windows[id].element.style.display = 'flex';
+        }
+        windows[id].element.style.zIndex = ++zIndexCounter;
+        // 更新所有窗口标题栏颜色
+        document.querySelectorAll('.title-bar').forEach(b => b.classList.add('inactive'));
+        windows[id].element.querySelector('.title-bar').classList.remove('inactive');
+        
+        document.querySelectorAll('.task-item').forEach(t => t.classList.remove('active'));
+        windows[id].taskBtn.classList.add('active');
+    }
+
+    function maximizeWindow(id) {
+        const win = windows[id].element;
+        if (win.style.width === '100%') {
+            win.style.width = '400px'; win.style.height = '300px';
+            win.style.top = '50px'; win.style.left = '50px';
+        } else {
+            win.style.width = '100%'; win.style.height = 'calc(100% - 30px)';
+            win.style.top = '0'; win.style.left = '0';
+        }
+    }
+
+    function createTaskbarItem(id, title) {
+        const btn = document.createElement('div');
+        btn.className = 'task-item active';
+        btn.innerText = title;
+        btn.onclick = () => focusWindow(id);
+        taskList.appendChild(btn);
+        return btn;
+    }
+
+    /* --- 拖拽逻辑 --- */
+    let isDragging = false;
+    let dragId = null;
+    let offsetX, offsetY;
+
+    function startDrag(e, id) {
+        isDragging = true;
+        dragId = id;
+        const rect = windows[id].element.getBoundingClientRect();
+        offsetX = e.clientX - rect.left;
+        offsetY = e.clientY - rect.top;
+        focusWindow(id);
+    }
+
+    window.onmousemove = (e) => {
+        if (isDragging && dragId) {
+            const win = windows[dragId].element;
+            // 简单的边界检查
+            let x = e.clientX - offsetX;
+            let y = e.clientY - offsetY;
+            if(y < 0) y = 0;
+            win.style.left = x + 'px';
+            win.style.top = y + 'px';
+        }
+    };
+
+    window.onmouseup = () => { isDragging = false; dragId = null; };
+
+    /* --- 开始菜单逻辑 --- */
+    const startBtn = document.getElementById('start-btn');
+    const startMenu = document.getElementById('start-menu');
+    
+    startBtn.onclick = (e) => {
+        e.stopPropagation();
+        toggleStartMenu();
+    };
+
+    function toggleStartMenu(forceState) {
+        const isVisible = startMenu.style.display === 'flex';
+        const newState = forceState !== undefined ? forceState : !isVisible;
+        startMenu.style.display = newState ? 'flex' : 'none';
+        if(newState) startBtn.classList.add('active');
+        else startBtn.classList.remove('active');
+    }
+    
+    window.addEventListener('click', (e) => {
+        if (!startMenu.contains(e.target) && e.target !== startBtn) {
+            toggleStartMenu(false);
+        }
+    });
+
+    function updateClock() {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        document.getElementById('clock').innerText = `${hours}:${minutes}`;
+    }
+
+    /* --- 应用程序内容生成器 --- */
+
+    function createExplorer(id) {
+        return `
+            <div style="background:white; height:100%; display:flex;">
+                <div style="width:100px; border-right:1px solid #888; padding:5px;">
+                    <div>📂 桌面</div>
+                    <div>📁 我的文档</div>
+                    <div>💿 (C:)</div>
+                    <div>📀 (D:)</div>
+                </div>
+                <div style="flex:1; padding:5px; display:grid; grid-template-columns: repeat(auto-fill, 60px); align-content: start;">
+                    <div style="text-align:center; margin:5px;"><div class="ico-txt" style="width:32px;height:32px;margin:0 auto;"></div>system.ini</div>
+                    <div style="text-align:center; margin:5px;"><div class="ico-txt" style="width:32px;height:32px;margin:0 auto;"></div>config.sys</div>
+                    <div style="text-align:center; margin:5px;"><div class="ico-game" style="width:32px;height:32px;margin:0 auto;"></div>doom.exe</div>
+                </div>
+            </div>
+        `;
+    }
+
+    function createNotepad(id) {
+        return `<textarea class="notepad-area">欢迎使用 Windows 98349... 记事本。
+这是一个非常先进的文本编辑器。
+你可以随心所欲地打字。</textarea>`;
+    }
+
+    function createCodeEditor(id) {
+        return `<textarea class="code-area" spellcheck="false">
+// Hello World in JavaScript
+function greet() {
+    console.log("Welcome to the Matrix");
+    return true;
+}
+
+// TODO: Hack the planet
+const system = "secure";
+</textarea>`;
+    }
+
+    /* --- 命令提示符 (CMD) --- */
+    function createCMD(id) {
+        return `<div class="cmd-content" id="cmd-out-${id}">
+            Microsoft Windows [版本 98.3494.537]<br>
+            (C) 版权所有 1998-2077 Microsoft Corp.<br><br>
+            C:\\Users\\Admin><span id="cmd-target-${id}"></span>
+            <input type="text" class="cmd-input" id="cmd-in-${id}" autofocus>
+        </div>`;
+    }
+
+    function initCMD(id) {
+        const input = document.getElementById(`cmd-in-${id}`);
+        const output = document.getElementById(`cmd-out-${id}`);
+        
+        input.onkeydown = (e) => {
+            if(e.key === 'Enter') {
+                const cmd = input.value.trim().toLowerCase();
+                const line = document.createElement('div');
+                line.innerHTML = `C:\\Users\\Admin> ${input.value}`;
+                output.insertBefore(line, input); // 插入到输入框之前
+                
+                let response = '';
+                if(cmd === 'help') response = '可用命令: DIR, VER, CLS, ECHO, COLOR, FORMAT C:';
+                else if(cmd === 'ver') response = 'Windows 98349453789759375947987984574987497545';
+                else if(cmd === 'dir') response = ' 卷中的驱动器 C 没有标签。<br> C:\\Users\\Admin 的目录<br><br>2023/10/27  12:00    &lt;DIR&gt;          .<br>2023/10/27  12:00    &lt;DIR&gt;          ..<br>               0 个文件              0 字节';
+                else if(cmd === 'cls') { 
+                    output.innerHTML = '<input type="text" class="cmd-input" id="cmd-in-'+id+'" autofocus>';
+                    initCMD(id); // 重新绑定事件
+                    return;
+                }
+                else if(cmd === 'format c:') {
+                     document.getElementById('bsod').style.display = 'block';
+                     document.getElementById('bsod').onclick = () => location.reload();
+                }
+                else if(cmd.startsWith('echo ')) response = input.value.substring(5);
+                else if(cmd === '') response = '';
+                else response = `'${cmd}' 不是内部或外部命令，也不是可运行的程序。`;
+
+                if(response) {
+                    const respDiv = document.createElement('div');
+                    respDiv.innerHTML = response;
+                    output.insertBefore(respDiv, input);
+                }
+                
+                input.value = '';
+                output.scrollTop = output.scrollHeight;
+            }
+        };
+    }
+
+    /* --- 画图 (Paint) --- */
+    function createPaint(id) {
+        return `
+            <div class="paint-tools">
+                工具: 
+                <div class="color-box" style="background:black" onclick="setColor('${id}', 'black')"></div>
+                <div class="color-box" style="background:red" onclick="setColor('${id}', 'red')"></div>
+                <div class="color-box" style="background:blue" onclick="setColor('${id}', 'blue')"></div>
+                <div class="color-box" style="background:green" onclick="setColor('${id}', 'green')"></div>
+                <div class="color-box" style="background:white" onclick="setColor('${id}', 'white')"></div>
+                <button onclick="clearPaint('${id}')">清空</button>
+            </div>
+            <canvas id="cvs-${id}" class="paint-canvas"></canvas>
+        `;
+    }
+
+    const paintContexts = {};
+    function initPaint(id) {
+        const canvas = document.getElementById(`cvs-${id}`);
+        const container = canvas.parentElement;
+        // 简单的尺寸适配
+        canvas.width = 500;
+        canvas.height = 350;
+        const ctx = canvas.getContext('2d');
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = 'black';
+        paintContexts[id] = ctx;
+
+        let painting = false;
+
+        canvas.onmousedown = (e) => {
+            painting = true;
+            ctx.beginPath();
+            const rect = canvas.getBoundingClientRect();
+            ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+        };
+        canvas.onmousemove = (e) => {
+            if(!painting) return;
+            const rect = canvas.getBoundingClientRect();
+            ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+            ctx.stroke();
+        };
+        canvas.onmouseup = () => painting = false;
+        canvas.onmouseleave = () => painting = false;
+    }
+    window.setColor = (id, color) => { paintContexts[id].strokeStyle = color; };
+    window.clearPaint = (id) => { 
+        const cvs = document.getElementById(`cvs-${id}`); 
+        paintContexts[id].clearRect(0,0,cvs.width, cvs.height); 
+    };
+
+    /* --- 贪吃蛇游戏 --- */
+    function createSnake(id) {
+        return `
+            <div class="snake-game-container">
+                <div class="score-board">分数: <span id="score-${id}">0</span></div>
+                <canvas id="snake-${id}" width="300" height="200"></canvas>
+                <div style="margin-top:10px; font-size:12px; color:white;">使用方向键移动</div>
+                <button onclick="startSnake('${id}')" style="margin-top:5px;">开始游戏</button>
+            </div>
+        `;
+    }
+
+    const snakeGames = {};
+    function initSnake(id) {
+        snakeGames[id] = { active: false, snake: [], food: {}, dx: 10, dy: 0, loop: null };
+    }
+
+    window.startSnake = (id) => {
+        const canvas = document.getElementById(`snake-${id}`);
+        const ctx = canvas.getContext('2d');
+        const game = snakeGames[id];
+        game.snake = [{x: 150, y: 100}, {x: 140, y: 100}, {x: 130, y: 100}];
+        game.score = 0;
+        game.active = true;
+        game.dx = 10; game.dy = 0;
+        createFood(id);
+        
+        if(game.loop) clearInterval(game.loop);
+        game.loop = setInterval(() => updateSnake(id, ctx, canvas), 100);
+        
+        // 绑定全局键盘事件，只针对当前激活的贪吃蛇窗口
+        document.onkeydown = (e) => {
+            if(!game.active) return;
+            // 检查此窗口是否在最上面
+            if(windows[id].element.style.zIndex != zIndexCounter) return;
+            
+            const key = e.key;
+            const goingUp = game.dy === -10;
+            const goingDown = game.dy === 10;
+            const goingRight = game.dx === 10;
+            const goingLeft = game.dx === -10;
+
+            if(key === 'ArrowLeft' && !goingRight) { game.dx = -10; game.dy = 0; }
+            if(key === 'ArrowUp' && !goingDown) { game.dx = 0; game.dy = -10; }
+            if(key === 'ArrowRight' && !goingLeft) { game.dx = 10; game.dy = 0; }
+            if(key === 'ArrowDown' && !goingUp) { game.dx = 0; game.dy = 10; }
+        };
+    };
+
+    function createFood(id) {
+        snakeGames[id].food = {
+            x: Math.floor(Math.random() * 29) * 10,
+            y: Math.floor(Math.random() * 19) * 10
+        };
+    }
+
+    function updateSnake(id, ctx, cvs) {
+        const game = snakeGames[id];
+        if(!game.active) return;
+
+        const head = { x: game.snake[0].x + game.dx, y: game.snake[0].y + game.dy };
+
+        // 碰撞检测
+        if(head.x < 0 || head.x >= cvs.width || head.y < 0 || head.y >= cvs.height || 
+           game.snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+            game.active = false;
+            clearInterval(game.loop);
+            alert('游戏结束! 分数: ' + game.score);
+            return;
+        }
+
+        game.snake.unshift(head);
+
+        if(head.x === game.food.x && head.y === game.food.y) {
+            game.score += 10;
+            document.getElementById(`score-${id}`).innerText = game.score;
+            createFood(id);
+        } else {
+            game.snake.pop();
+        }
+
+        // 绘制
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, cvs.width, cvs.height);
+        
+        ctx.fillStyle = 'lime';
+        game.snake.forEach(part => ctx.fillRect(part.x, part.y, 9, 9));
+        
+        ctx.fillStyle = 'red';
+        ctx.fillRect(game.food.x, game.food.y, 9, 9);
+    }
+
+    /* --- 视频编辑器 (Mockup) --- */
+    function createVideoEditor(id) {
+        return `
+            <div class="video-editor">
+                <div class="video-preview" id="vid-prev-${id}">
+                    <div id="vid-obj-${id}" style="width:50px; height:50px; background:red; border-radius:50%; position:absolute;"></div>
+                    <div style="color:#555; font-size:20px;">CLIP MAKER 2000 PREVIEW</div>
+                </div>
+                <div style="background:#ccc; padding:5px;">
+                    <button class="play-btn" onclick="playVideo('${id}')">▶ 渲染并播放时间线</button>
+                </div>
+                <div class="timeline">
+                    <div class="clip" style="background:darkred">开场</div>
+                    <div class="clip" style="background:navy">缩放特效</div>
+                    <div class="clip" style="background:darkgreen">旋转</div>
+                    <div class="clip" style="background:purple">故障</div>
+                    <div class="clip" style="background:black">黑屏</div>
+                </div>
+            </div>
+        `;
+    }
+
+    function initVideo(id) {
+        // 占位，防止报错
+    }
+
+    window.playVideo = (id) => {
+        const obj = document.getElementById(`vid-obj-${id}`);
+        const preview = document.getElementById(`vid-prev-${id}`);
+        let step = 0;
+        
+        // 简单的动画序列
+        const anim = setInterval(() => {
+            step++;
+            if(step < 20) {
+                obj.style.transform = `translate(${step*5}px, ${step*2}px)`;
+                preview.style.background = 'black';
+            } else if (step < 40) {
+                obj.style.transform = `scale(${step/20})`;
+                preview.style.background = '#111';
+            } else if (step < 60) {
+                obj.style.transform = `rotate(${step*10}deg)`;
+                preview.style.background = '#220';
+            } else if (step < 80) {
+                // Glitch effect
+                obj.style.display = Math.random() > 0.5 ? 'none' : 'block';
+                preview.style.filter = `invert(${Math.random()})`;
+            } else {
+                clearInterval(anim);
+                obj.style.transform = 'none';
+                obj.style.display = 'block';
+                preview.style.filter = 'none';
+                preview.style.background = '#000';
+                alert('渲染完成!');
+            }
+        }, 50);
+    }
+
+</script>
+</body>
+</html>

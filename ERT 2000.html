@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERT 2000 专业版</title>
+    <style>
+        :root {
+            --bg-color: #008080;
+            --win-gray: #c0c0c0;
+            --win-dark: #808080;
+            --win-light: #ffffff;
+            --win-blue: #000080;
+            --win-blue-grad: #1084d0;
+            /* 添加微软雅黑以优化中文显示 */
+            --font-main: 'Segoe UI', 'Microsoft YaHei', Tahoma, sans-serif;
+            --font-mono: 'Consolas', 'Courier New', monospace;
+        }
+
+        * { box-sizing: border-box; user-select: none; }
+        body { margin: 0; padding: 0; overflow: hidden; background-color: var(--bg-color); font-family: var(--font-main); height: 100vh; cursor: default; }
+
+        /* 开机画面 */
+        #boot-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; color: #fff; z-index: 9999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-family: var(--font-mono);
+        }
+        .loader { width: 300px; height: 20px; border: 2px solid #fff; margin-top: 20px; position: relative; }
+        .loader-bar { height: 100%; background: #fff; width: 0%; transition: width 0.1s; }
+
+        /* UI 组件 (复古 3D 效果) */
+        .bevel {
+            background: var(--win-gray);
+            border-top: 2px solid var(--win-light);
+            border-left: 2px solid var(--win-light);
+            border-right: 2px solid var(--win-dark);
+            border-bottom: 2px solid #000;
+        }
+        .bevel-inset {
+            background: #fff;
+            border-top: 2px solid #000;
+            border-left: 2px solid #000;
+            border-right: 2px solid var(--win-light);
+            border-bottom: 2px solid var(--win-light);
+        }
+        
+        /* 桌面 */
+        #desktop { width: 100%; height: calc(100% - 40px); position: relative; display: flex; flex-direction: column; flex-wrap: wrap; align-content: flex-start; padding: 10px; }
+        
+        .desktop-icon {
+            width: 80px; height: 90px; margin: 10px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: white; cursor: pointer; text-shadow: 1px 1px 2px black;
+        }
+        .desktop-icon:hover { background: rgba(0,0,128,0.3); border: 1px dotted white; }
+        .icon-img { font-size: 40px; margin-bottom: 5px; }
+        .icon-label { text-align: center; font-size: 12px; line-height: 1.2; }
+
+        /* 窗口系统 */
+        .window {
+            position: absolute; display: flex; flex-direction: column;
+            box-shadow: 4px 4px 10px rgba(0,0,0,0.5);
+            min-width: 200px; min-height: 150px;
+            padding: 3px;
+        }
+        .title-bar {
+            height: 25px; background: linear-gradient(90deg, var(--win-blue), var(--win-blue-grad));
+            color: white; display: flex; align-items: center; justify-content: space-between;
+            padding: 0 4px; font-weight: bold; font-size: 13px; cursor: default;
+        }
+        .title-bar.inactive { background: var(--win-dark); }
+        .window-controls button {
+            width: 18px; height: 18px; font-size: 10px; font-weight: bold;
+            border: 1px solid #fff; background: var(--win-gray); margin-left: 2px;
+            box-shadow: inset 1px 1px 0px #fff, inset -1px -1px 0px #000; cursor: pointer;
+        }
+        .window-controls button:active { box-shadow: inset 1px 1px 0px #000; }
+        .window-body { flex: 1; overflow: hidden; position: relative; margin-top: 2px; }
+        
+        /* 任务栏 */
+        #taskbar {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 40px;
+            display: flex; align-items: center; padding: 3px; z-index: 9000;
+        }
+        #start-btn {
+            height: 100%; padding: 0 10px; display: flex; align-items: center; gap: 5px;
+            font-weight: bold; font-style: italic; font-size: 16px; cursor: pointer;
+        }
+        #start-btn img { width: 20px; height: 20px; }
+        .divider { width: 2px; height: 80%; background: var(--win-dark); margin: 0 5px; border-right: 1px solid var(--win-light); }
+        #task-list { flex: 1; display: flex; gap: 3px; overflow: hidden; }
+        .task-item {
+            width: 150px; height: 100%; display: flex; align-items: center; padding: 0 5px;
+            font-size: 12px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .task-item.active { background: #eee; box-shadow: inset 2px 2px 2px #000; font-weight: bold; }
+        #clock {
+            padding: 0 15px; font-size: 12px;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        /* 开始菜单 */
+        #start-menu {
+            position: absolute; bottom: 42px; left: 3px; width: 250px;
+            background: var(--win-gray); z-index: 9999; display: none;
+            box-shadow: 4px 4px 5px rgba(0,0,0,0.5);
+            border: 2px solid var(--win-light); border-right-color: #000; border-bottom-color: #000;
+        }
+        .start-sidebar {
+            width: 25px; background: var(--win-blue); color: white;
+            writing-mode: vertical-rl; text-orientation: mixed;
+            text-align: center; font-weight: bold; font-size: 20px; padding: 10px 0;
+            background: linear-gradient(to bottom, #000080, #0000ff);
+            float: left; height: 300px;
+        }
+        .menu-item {
+            padding: 10px; cursor: pointer; display: flex; align-items: center; gap: 10px;
+        }
+        .menu-item:hover { background: #000080; color: white; }
+
+        /* 应用程序特定样式 */
+        textarea { width: 100%; height: 100%; resize: none; border: none; outline: none; font-family: var(--font-mono); padding: 5px; }
+        
+        /* 终端 */
+        .term-body { background: #000; color: #0f0; font-family: var(--font-mono); padding: 5px; height: 100%; overflow-y: auto; font-size: 14px; }
+        .prompt-line { display: flex; }
+        .prompt-input { background: transparent; border: none; color: #0f0; flex: 1; outline: none; font-family: var(--font-mono); font-size: 14px; }
+
+        /* 资源管理器 */
+        .file-grid { display: flex; flex-wrap: wrap; padding: 10px; background: #fff; height: 100%; align-content: flex-start; overflow-y: auto; }
+        .file-item { width: 70px; height: 80px; display: flex; flex-direction: column; align-items: center; margin: 5px; cursor: pointer; font-size: 12px; text-align: center; color: #000;}
+        .file-item:hover { background: #e0e0ff; border: 1px solid #aaa; }
+        .file-icon { font-size: 32px; }
+
+        /* 代码编辑器 */
+        .code-container { display: flex; height: 100%; flex-direction: column; }
+        .code-toolbar { height: 30px; background: #eee; display: flex; align-items: center; padding: 0 5px; gap: 5px; border-bottom: 1px solid #aaa; }
+        .editor-area { flex: 1; display: flex; background: #fff; overflow: hidden; }
+        .line-numbers { width: 30px; background: #f0f0f0; text-align: right; padding-right: 5px; color: #888; font-family: var(--font-mono); font-size: 13px; padding-top: 5px; border-right: 1px solid #ccc; }
+        .code-input { flex: 1; border: none; outline: none; font-family: var(--font-mono); font-size: 13px; padding: 5px; white-space: pre; overflow: auto; }
+        
+        /* 画图 */
+        .paint-toolbar { height: 60px; background: var(--win-gray); display: flex; align-items: center; gap: 10px; padding: 5px; border-bottom: 1px solid #888; }
+        .color-box { width: 20px; height: 20px; border: 1px solid #000; cursor: pointer; }
+        .color-palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; }
+        #paint-canvas { background: #fff; cursor: crosshair; display: block; }
+
+        /* 视频编辑器 */
+        .video-ui { display: flex; flex-direction: column; height: 100%; background: #333; color: #fff; }
+        .video-preview { flex: 1; background: #000; display: flex; align-items: center; justify-content: center; position: relative;}
+        .timeline { height: 100px; background: #444; border-top: 1px solid #666; position: relative; overflow-x: auto; white-space: nowrap; padding: 10px; }
+        .clip { display: inline-block; height: 60px; width: 100px; background: #55a; border: 1px solid #88f; margin-right: 2px; position: relative; cursor: move; }
+        .playhead { position: absolute; left: 10px; top: 0; width: 2px; height: 100%; background: red; z-index: 10; pointer-events: none; }
+        
+        /* 蓝屏死机 (BSOD) */
+        #bsod { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #0000aa; color: #fff; font-family: var(--font-mono); padding: 50px; z-index: 10000; display: none; }
+
+        /* 辅助类 */
+        .resize-handle { position: absolute; bottom: 0; right: 0; width: 15px; height: 15px; cursor: se-resize; }
+    </style>
+</head>
+<body>
+
+    <!-- 开机画面 -->
+    <div id="boot-screen">
+        <div style="font-size: 40px; font-weight: bold; margin-bottom: 20px;">ERT 2000</div>
+        <div>能源 · 可靠 · 科技</div>
+        <div>256 MB 内存检测通过</div>
+        <div class="loader"><div class="loader-bar" id="loader-bar"></div></div>
+        <div id="boot-text" style="margin-top: 10px; font-size: 12px; color: #aaa;">正在初始化内核...</div>
+    </div>
+
+    <!-- 蓝屏 (BSOD) -->
+    <div id="bsod">
+        <p>系统检测到一个问题，ERT 2000 已经被关闭以防止损坏您的计算机。</p>
+        <p>DRIVER_IRQL_NOT_LESS_OR_EQUAL</p>
+        <p>如果这是您第一次看到此停止错误屏幕，请重新启动计算机。如果此屏幕再次出现，请按照以下步骤操作：</p>
+        <p>检查以确保任何新硬件或软件已正确安装。</p>
+        <p>技术信息：</p>
+        <p>*** STOP: 0x000000D1 (0x0000000C, 0x00000002, 0x00000000, 0xF86B5A89)</p>
+        <br><br>
+        <p>按 F5 刷新 (真的可以点)</p>
+    </div>
+
+    <!-- 桌面 -->
+    <div id="desktop">
+        <!-- 图标将由 JS 生成 -->
+    </div>
+
+    <!-- 开始菜单 -->
+    <div id="start-menu" class="bevel">
+        <div class="start-sidebar">ERT 2000</div>
+        <div style="margin-left: 30px; padding-top: 5px;">
+            <div class="menu-item" onclick="appManager.open('calc')">🧮 计算器</div>
+            <div class="menu-item" onclick="appManager.open('notepad')">📝 记事本</div>
+            <div class="menu-item" onclick="appManager.open('paint')">🎨 画图</div>
+            <div class="menu-item" onclick="appManager.open('terminal')">💻 终端</div>
+            <div class="menu-item" onclick="appManager.open('explorer')">📁 资源管理器</div>
+            <div class="menu-item" onclick="appManager.open('snake')">🐍 赛博贪吃蛇</div>
+            <div class="menu-item" onclick="appManager.open('code')">👨‍💻 代码工作室</div>
+            <div class="menu-item" onclick="appManager.open('video')">🎬 电影制作</div>
+            <div style="height: 1px; background: #888; margin: 5px 10px;"></div>
+            <div class="menu-item" onclick="system.shutdown()">🔌 关机</div>
+        </div>
+    </div>
+
+    <!-- 任务栏 -->
+    <div id="taskbar" class="bevel">
+        <div id="start-btn" class="bevel" onclick="system.toggleStartMenu()">
+            <span>🏁</span> 开始
+        </div>
+        <div class="divider"></div>
+        <div id="task-list">
+            <!-- 任务项在此生成 -->
+        </div>
+        <div class="divider"></div>
+        <div id="clock" class="bevel-inset">12:00</div>
+    </div>
+
+<script>
+/**
+ * ERT 2000 核心系统
+ */
+
+// --- 声音系统 ---
+const Sound = {
+    ctx: null,
+    init: () => {
+        if (!Sound.ctx) Sound.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    },
+    playTone: (freq, type, duration) => {
+        if (!Sound.ctx) return;
+        const osc = Sound.ctx.createOscillator();
+        const gain = Sound.ctx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        osc.connect(gain);
+        gain.connect(Sound.ctx.destination);
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.00001, Sound.ctx.currentTime + duration);
+        osc.stop(Sound.ctx.currentTime + duration);
+    },
+    click: () => Sound.playTone(600, 'sine', 0.1),
+    error: () => { Sound.playTone(150, 'sawtooth', 0.3); setTimeout(()=>Sound.playTone(100, 'sawtooth', 0.3), 100) },
+    startup: () => {
+        setTimeout(() => Sound.playTone(440, 'sine', 0.5), 0);
+        setTimeout(() => Sound.playTone(554, 'sine', 0.5), 200);
+        setTimeout(() => Sound.playTone(659, 'sine', 1.0), 400);
+    }
+};
+
+// --- 模拟文件系统 ---
+const FileSystem = {
+    files: {
+        "C:": {
+            "我的文档": {
+                "待办事项.txt": "1. 买牛奶\n2. 写代码\n3. 睡觉",
+                "秘密.txt": "密码是：ERT_ROCKS"
+            },
+            "System": {
+                "config.sys": "FILES=30\nBUFFERS=20",
+                "autoexec.bat": "@echo off\nprompt $p$g"
+            },
+            "项目": {
+                "hello.py": "print('你好 ERT 2000!')",
+                "web.html": "<h1>欢迎</h1>"
+            }
+        }
+    },
+    currentPath: ["C:"],
+    get: function(pathArr) {
+        let curr = this.files;
+        for (let p of pathArr) {
+            if (curr[p]) curr = curr[p];
+            else return null;
+        }
+        return curr;
+    }
+};
+
+// --- 窗口管理器 ---
+const WindowManager = {
+    zIndex: 100,
+    windows: [],
+    
+    create: (appId, title, width, height, contentHtml, onResize) => {
+        Sound.init();
+        Sound.click();
+        
+        const id = 'win-' + Date.now();
+        const win = document.createElement('div');
+        win.className = 'window bevel';
+        win.id = id;
+        win.style.width = width + 'px';
+        win.style.height = height + 'px';
+        win.style.left = (50 + WindowManager.windows.length * 20) + 'px';
+        win.style.top = (50 + WindowManager.windows.length * 20) + 'px';
+        win.style.zIndex = ++WindowManager.zIndex;
+
+        win.innerHTML = `
+            <div class="title-bar">
+                <div class="title"><span style="margin-right:5px">${AppList[appId].icon}</span>${title}</div>
+                <div class="window-controls">
+                    <button onclick="WindowManager.minimize('${id}')">_</button>
+                    <button onclick="WindowManager.maximize('${id}')">□</button>
+                    <button onclick="WindowManager.close('${id}')">X</button>
+                </div>
+            </div>
+            <div class="window-body bevel-inset">${contentHtml}</div>
+            <div class="resize-handle"></div>
+        `;
+
+        document.body.appendChild(win);
+        
+        // 窗口对象
+        const winObj = { id, el: win, appId, title, minimized: false, onResize };
+        WindowManager.windows.push(winObj);
+        TaskManager.addTask(winObj);
+
+        // 事件监听
+        const titleBar = win.querySelector('.title-bar');
+        titleBar.addEventListener('mousedown', (e) => {
+            if(e.target.tagName === 'BUTTON') return;
+            WindowManager.focus(id);
+            WindowManager.startDrag(e, win);
+        });
+        
+        win.addEventListener('mousedown', () => WindowManager.focus(id));
+
+        // 调整大小逻辑
+        const resizeHandle = win.querySelector('.resize-handle');
+        resizeHandle.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            WindowManager.startResize(e, win, winObj);
+        });
+
+        return win.querySelector('.window-body');
+    },
+
+    close: (id) => {
+        const win = document.getElementById(id);
+        if (win) {
+            win.remove();
+            WindowManager.windows = WindowManager.windows.filter(w => w.id !== id);
+            TaskManager.removeTask(id);
+        }
+    },
+
+    minimize: (id) => {
+        const win = document.getElementById(id);
+        win.style.display = 'none';
+        const wObj = WindowManager.windows.find(w => w.id === id);
+        if(wObj) wObj.minimized = true;
+        TaskManager.update();
+    },
+
+    restore: (id) => {
+        const win = document.getElementById(id);
+        win.style.display = 'flex';
+        WindowManager.focus(id);
+        const wObj = WindowManager.windows.find(w => w.id === id);
+        if(wObj) wObj.minimized = false;
+        TaskManager.update();
+    },
+    
+    maximize: (id) => {
+        const win = document.getElementById(id);
+        if(win.style.width === '100%') {
+            // 还原大小 (简化版)
+            win.style.width = '600px'; win.style.height = '400px';
+            win.style.top = '50px'; win.style.left = '50px';
+        } else {
+            win.style.width = '100%'; win.style.height = 'calc(100% - 40px)';
+            win.style.top = '0'; win.style.left = '0';
+        }
+    },
+
+    focus: (id) => {
+        const win = document.getElementById(id);
+        if (!win) return;
+        win.style.zIndex = ++WindowManager.zIndex;
+        document.querySelectorAll('.title-bar').forEach(tb => tb.classList.add('inactive'));
+        win.querySelector('.title-bar').classList.remove('inactive');
+        TaskManager.updateActive(id);
+    },
+
+    startDrag: (e, el) => {
+        let shiftX = e.clientX - el.getBoundingClientRect().left;
+        let shiftY = e.clientY - el.getBoundingClientRect().top;
+
+        function moveAt(pageX, pageY) {
+            el.style.left = pageX - shiftX + 'px';
+            el.style.top = pageY - shiftY + 'px';
+        }
+
+        function onMouseMove(event) { moveAt(event.pageX, event.pageY); }
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', () => {
+            document.removeEventListener('mousemove', onMouseMove);
+        }, {once: true});
+    },
+
+    startResize: (e, el, winObj) => {
+        function onMouseMove(event) {
+            el.style.width = (event.pageX - el.getBoundingClientRect().left) + 'px';
+            el.style.height = (event.pageY - el.getBoundingClientRect().top) + 'px';
+            if(winObj.onResize) winObj.onResize();
+        }
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', () => {
+            document.removeEventListener('mousemove', onMouseMove);
+        }, {once: true});
+    }
+};
+
+// --- 任务栏管理器 ---
+const TaskManager = {
+    addTask: (winObj) => {
+        const bar = document.getElementById('task-list');
+        const item = document.createElement('div');
+        item.className = 'task-item bevel';
+        item.id = 'task-' + winObj.id;
+        item.innerHTML = `${AppList[winObj.appId].icon} ${winObj.title}`;
+        item.onclick = () => {
+            if (winObj.minimized) WindowManager.restore(winObj.id);
+            else if (document.getElementById(winObj.id).style.zIndex == WindowManager.zIndex) WindowManager.minimize(winObj.id);
+            else WindowManager.focus(winObj.id);
+        };
+        bar.appendChild(item);
+    },
+    removeTask: (id) => {
+        const el = document.getElementById('task-' + id);
+        if(el) el.remove();
+    },
+    updateActive: (id) => {
+        document.querySelectorAll('.task-item').forEach(t => t.classList.remove('active'));
+        const el = document.getElementById('task-' + id);
+        if(el) el.classList.add('active');
+    },
+    update: () => {
+        // 刷新状态
+    }
+};
+
+// --- 应用程序 ---
+const AppList = {
+    'notepad': { name: '记事本', icon: '📝' },
+    'terminal': { name: '终端', icon: '💻' },
+    'calc': { name: '计算器', icon: '🧮' },
+    'paint': { name: '画图', icon: '🎨' },
+    'explorer': { name: '资源管理器', icon: '📁' },
+    'snake': { name: '赛博贪吃蛇', icon: '🐍' },
+    'code': { name: '代码工作室', icon: '👨‍💻' },
+    'video': { name: '电影制作', icon: '🎬' }
+};
+
+const appManager = {
+    open: (appId) => {
+        document.getElementById('start-menu').style.display = 'none';
+        
+        switch(appId) {
+            case 'notepad':
+                WindowManager.create(appId, '记事本 - 无标题', 400, 300, 
+                    `<textarea placeholder="在此输入..."></textarea>`);
+                break;
+                
+            case 'terminal':
+                const termBody = WindowManager.create(appId, 'C:\\WINDOWS\\System32\\cmd.exe', 500, 350,
+                    `<div class="term-body" id="term-${Date.now()}">
+                        <div>ERT 2000 [版本 1.0.256]</div>
+                        <div>(c) 2000 ERT 公司。保留所有权利。</div><br>
+                        <div>输入 'python' 进入 Python 模式。</div><br>
+                        <div class="prompt-line">
+                            <span>C:\\></span><input type="text" class="prompt-input" autofocus>
+                        </div>
+                    </div>`);
+                initTerminal(termBody.querySelector('.term-body'));
+                break;
+
+            case 'calc':
+                WindowManager.create(appId, '计算器', 250, 300, 
+                    `<div style="padding:10px; height:100%; display:flex; flex-direction:column; gap:5px;">
+                        <input id="calc-display" type="text" readonly style="width:100%; height:40px; text-align:right; margin-bottom:5px; font-family:monospace; font-size:20px;">
+                        <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:5px; flex:1;">
+                             ${['7','8','9','/','4','5','6','*','1','2','3','-','C','0','=','+'].map(b => 
+                                 `<button onclick="calcInput('${b}')" style="height:100%; font-weight:bold;">${b}</button>`
+                             ).join('')}
+                        </div>
+                    </div>`);
+                break;
+
+            case 'paint':
+                const pBody = WindowManager.create(appId, '画图', 500, 400,
+                    `<div class="paint-container" style="height:100%; display:flex; flex-direction:column;">
+                        <div class="paint-toolbar">
+                            <div class="color-palette" id="palette"></div>
+                            <div style="display:flex; flex-direction:column; font-size:10px;">
+                                <span>大小: <input type="range" min="1" max="10" value="2" id="brush-size"></span>
+                                <span id="curr-color-disp" style="width:20px; height:10px; background:black; border:1px solid #000;"></span>
+                            </div>
+                            <button onclick="clearCanvas()">清空</button>
+                        </div>
+                        <div style="flex:1; overflow:hidden; background:#808080; padding:10px; position:relative;">
+                            <canvas id="paint-canvas" width="800" height="600"></canvas>
+                        </div>
+                    </div>`);
+                initPaint(pBody);
+                break;
+                
+            case 'explorer':
+                const expBody = WindowManager.create(appId, '资源管理器', 450, 300, 
+                    `<div style="height:100%; display:flex; flex-direction:column;">
+                        <div style="padding:5px; background:#eee; border-bottom:1px solid #999;">地址: C:\\</div>
+                        <div class="file-grid" id="file-grid"></div>
+                    </div>`);
+                renderExplorer(expBody.querySelector('.file-grid'), FileSystem.files['C:']);
+                break;
+
+            case 'snake':
+                const snakeBody = WindowManager.create(appId, '赛博贪吃蛇', 320, 360,
+                    `<canvas id="snake-canvas" width="300" height="300" style="background:#000; display:block; margin:0 auto;"></canvas>
+                     <div style="text-align:center; color:#000; margin-top:5px;">使用方向键移动。按空格重新开始。</div>`);
+                initSnake(snakeBody.querySelector('canvas'));
+                break;
+
+            case 'code':
+                const codeBody = WindowManager.create(appId, '代码工作室', 600, 450,
+                    `<div class="code-container">
+                        <div class="code-toolbar">
+                            <button>▶ 运行</button> <button>💾 保存</button> <span>hello.js</span>
+                        </div>
+                        <div class="editor-area">
+                            <div class="line-numbers">1</div>
+                            <div class="code-input" contenteditable="true" spellcheck="false">console.log("你好，世界");</div>
+                        </div>
+                    </div>`);
+                initCodeEditor(codeBody);
+                break;
+
+            case 'video':
+                const vidBody = WindowManager.create(appId, 'ERT 电影制作', 600, 400,
+                    `<div class="video-ui">
+                        <div class="video-preview">
+                            <canvas id="vid-canvas" width="320" height="240" style="background:#000;"></canvas>
+                            <div style="position:absolute; top:10px; left:10px; color:lime;">预览</div>
+                        </div>
+                        <div style="padding:5px; background:#444;">
+                            <button onclick="playVideo()">▶ 播放</button> <button onclick="stopVideo()">⏹ 停止</button>
+                        </div>
+                        <div class="timeline" id="vid-timeline">
+                            <div class="playhead" id="vid-playhead"></div>
+                            <div class="clip" style="background:red; left:20px;" onmousedown="dragClip(event, this)">片段 1</div>
+                            <div class="clip" style="background:green; left:130px;" onmousedown="dragClip(event, this)">片段 2</div>
+                            <div class="clip" style="background:blue; left:240px;" onmousedown="dragClip(event, this)">片段 3</div>
+                        </div>
+                    </div>`);
+                initVideoEditor(vidBody);
+                break;
+        }
+    }
+};
+
+// --- 应用逻辑 ---
+
+// 计算器
+let calcExp = '';
+function calcInput(val) {
+    const disp = document.getElementById('calc-display');
+    if (val === 'C') calcExp = '';
+    else if (val === '=') {
+        try { calcExp = eval(calcExp).toString(); } catch { calcExp = '错误'; Sound.error(); }
+    } else { calcExp += val; }
+    disp.value = calcExp;
+}
+
+// 终端
+function initTerminal(container) {
+    const input = container.querySelector('.prompt-input');
+    let pyMode = false;
+    
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            const cmd = input.value.trim();
+            const output = document.createElement('div');
+            output.style.marginBottom = '10px';
+            output.innerText = (pyMode ? '>>> ' : 'C:\\> ') + cmd;
+            container.insertBefore(output, container.querySelector('.prompt-line'));
+            
+            const response = document.createElement('div');
+            response.style.color = '#fff';
+            response.style.marginBottom = '10px';
+            
+            if (pyMode) {
+                if (cmd === 'exit()') {
+                    pyMode = false;
+                    response.innerText = "正在退出 Python...";
+                } else {
+                    try {
+                        // 假 Python，使用 JS eval 模拟 print
+                        const pyCmd = cmd.replace(/print\((.*)\)/, "return $1");
+                        let res = new Function(pyCmd)();
+                        if(res !== undefined) response.innerText = res;
+                    } catch (err) {
+                        response.innerText = "Traceback (most recent call last):\n  File <stdin>, line 1\nSyntaxError: " + err.message;
+                    }
+                }
+            } else {
+                switch(cmd.toLowerCase().split(' ')[0]) {
+                    case 'help': response.innerText = "可用命令: help, dir, cls, echo, python, date, ver, bsod"; break;
+                    case 'dir': response.innerText = " 驱动器 C 中的卷没有标签。\n C:\\ 的目录\n\n01/01/2000  12:00 PM    <DIR>          我的文档\n01/01/2000  12:00 PM    <DIR>          System\n               2 个文件            0 字节"; break;
+                    case 'cls': container.innerHTML = '<div class="prompt-line"><span>C:\\></span><input type="text" class="prompt-input" autofocus></div>'; initTerminal(container); return;
+                    case 'echo': response.innerText = cmd.substring(5); break;
+                    case 'python': pyMode = true; response.innerText = "Python 2.0 (default, Oct 16 2000)\n[GCC 2.95.2] on win32\n输入 \"help\", \"copyright\" 获取更多信息。"; break;
+                    case 'date': response.innerText = new Date().toString(); break;
+                    case 'ver': response.innerText = "ERT 2000 [版本 1.0.256]"; break;
+                    case 'bsod': document.getElementById('bsod').style.display = 'block'; Sound.error(); break;
+                    case '': break;
+                    default: response.innerText = `'${cmd}' 不是内部或外部命令，也不是可运行的程序。`;
+                }
+            }
+            
+            if(response.innerText) container.insertBefore(response, container.querySelector('.prompt-line'));
+            input.value = '';
+            input.focus();
+            container.scrollTop = container.scrollHeight;
+            
+            // 更新提示符
+            container.querySelector('.prompt-line span').innerText = pyMode ? '>>> ' : 'C:\\> ';
+        }
+    });
+    
+    container.addEventListener('click', () => input.focus());
+}
+
+// 画图
+function initPaint(container) {
+    const cvs = container.querySelector('canvas');
+    const ctx = cvs.getContext('2d');
+    const palette = container.querySelector('#palette');
+    const colors = ['#000','#fff','#888','#f00','#0f0','#00f','#ff0','#0ff','#f0f','#800','#080','#008','#880','#088','#808','#fa0'];
+    let color = '#000';
+    let drawing = false;
+
+    colors.forEach(c => {
+        let div = document.createElement('div');
+        div.className = 'color-box';
+        div.style.background = c;
+        div.onclick = () => { color = c; container.querySelector('#curr-color-disp').style.background = c; };
+        palette.appendChild(div);
+    });
+
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0,0,800,600);
+
+    cvs.addEventListener('mousedown', (e) => {
+        drawing = true;
+        ctx.beginPath();
+        ctx.moveTo(e.offsetX, e.offsetY);
+    });
+    cvs.addEventListener('mousemove', (e) => {
+        if(!drawing) return;
+        ctx.lineTo(e.offsetX, e.offsetY);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = container.querySelector('#brush-size').value;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+    });
+    window.addEventListener('mouseup', () => drawing = false);
+    window.clearCanvas = () => { ctx.fillRect(0,0,800,600); };
+}
+
+// 资源管理器
+function renderExplorer(container, folderObj) {
+    container.innerHTML = '';
+    if(!folderObj) return;
+    
+    for (let key in folderObj) {
+        let isDir = typeof folderObj[key] === 'object';
+        let item = document.createElement('div');
+        item.className = 'file-item';
+        item.innerHTML = `<div class="file-icon">${isDir ? '📁' : '📄'}</div><div>${key}</div>`;
+        item.onclick = () => {
+            if(isDir) renderExplorer(container, folderObj[key]);
+            else alert("正在打开 " + key + "\n\n" + folderObj[key]);
+        };
+        container.appendChild(item);
+    }
+    // 返回按钮逻辑
+    if(folderObj !== FileSystem.files["C:"]) {
+        let back = document.createElement('div');
+        back.className = 'file-item';
+        back.innerHTML = `<div class="file-icon">⬅️</div><div>返回</div>`;
+        back.onclick = () => renderExplorer(container, FileSystem.files["C:"]);
+        container.insertBefore(back, container.firstChild);
+    }
+}
+
+// 代码编辑器
+function initCodeEditor(container) {
+    const input = container.querySelector('.code-input');
+    const lines = container.querySelector('.line-numbers');
+    input.addEventListener('input', () => {
+        const lineCount = input.innerText.split('\n').length;
+        lines.innerText = Array(lineCount).fill(0).map((_,i)=>i+1).join('\n');
+    });
+    container.querySelector('button').onclick = () => {
+        try { eval(input.innerText); } catch(e) { alert(e); }
+    };
+}
+
+// 贪吃蛇
+function initSnake(canvas) {
+    const ctx = canvas.getContext('2d');
+    let snake = [{x:10, y:10}];
+    let dir = {x:1, y:0};
+    let food = {x:15, y:15};
+    let score = 0;
+    let gameLoop;
+
+    function draw() {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, 300, 300);
+        
+        // 食物
+        ctx.fillStyle = '#f00';
+        ctx.fillRect(food.x*10, food.y*10, 9, 9);
+        
+        // 蛇
+        ctx.fillStyle = '#0f0';
+        snake.forEach(s => ctx.fillRect(s.x*10, s.y*10, 9, 9));
+        
+        // 逻辑
+        let head = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
+        
+        if (head.x < 0 || head.x >= 30 || head.y < 0 || head.y >= 30 || snake.some(s => s.x===head.x && s.y===head.y)) {
+            clearInterval(gameLoop);
+            ctx.fillStyle = 'white';
+            ctx.fillText("游戏结束", 125, 150);
+            return;
+        }
+
+        snake.unshift(head);
+        if (head.x === food.x && head.y === food.y) {
+            score++;
+            food = {x: Math.floor(Math.random()*30), y: Math.floor(Math.random()*30)};
+        } else {
+            snake.pop();
+        }
+    }
+    
+    document.addEventListener('keydown', e => {
+        if(e.key === 'ArrowUp' && dir.y===0) dir = {x:0, y:-1};
+        if(e.key === 'ArrowDown' && dir.y===0) dir = {x:0, y:1};
+        if(e.key === 'ArrowLeft' && dir.x===0) dir = {x:-1, y:0};
+        if(e.key === 'ArrowRight' && dir.x===0) dir = {x:1, y:0};
+        if(e.code === 'Space') {
+            snake = [{x:10, y:10}]; dir = {x:1, y:0}; score=0;
+            clearInterval(gameLoop); gameLoop = setInterval(draw, 100);
+        }
+    });
+    
+    gameLoop = setInterval(draw, 100);
+}
+
+// 视频编辑器 (模拟)
+let vidInterval;
+function initVideoEditor(container) {
+    window.dragClip = (e, el) => {
+        e.preventDefault();
+        let shiftX = e.clientX - el.getBoundingClientRect().left;
+        const timeline = container.querySelector('.timeline');
+        
+        function moveAt(pageX) {
+            let newLeft = pageX - shiftX - timeline.getBoundingClientRect().left + timeline.scrollLeft;
+            if(newLeft < 0) newLeft = 0;
+            el.style.left = newLeft + 'px';
+        }
+        function onMouseMove(event) { moveAt(event.pageX); }
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', () => {
+            document.removeEventListener('mousemove', onMouseMove);
+        }, {once: true});
+    };
+
+    window.playVideo = () => {
+        const ph = document.getElementById('vid-playhead');
+        const cvs = document.getElementById('vid-canvas');
+        const ctx = cvs.getContext('2d');
+        const clips = document.querySelectorAll('.clip');
+        let pos = 0;
+        clearInterval(vidInterval);
+        vidInterval = setInterval(() => {
+            pos += 2;
+            ph.style.left = pos + 'px';
+            if(pos > 500) { pos = 0; }
+            
+            // 简单的渲染逻辑
+            let activeColor = '#000';
+            clips.forEach(c => {
+                let left = parseInt(c.style.left);
+                let right = left + 100; // width
+                if(pos >= left && pos <= right) activeColor = c.style.background;
+            });
+            
+            ctx.fillStyle = activeColor;
+            ctx.fillRect(0,0,320,240);
+            
+            // 绘制文字
+            ctx.fillStyle = 'white';
+            ctx.font = "20px Arial";
+            ctx.fillText(activeColor === '#000' ? "无信号" : "场景 1", 100, 120);
+            
+        }, 50);
+    };
+    window.stopVideo = () => clearInterval(vidInterval);
+}
+
+
+// --- 系统启动 ---
+const system = {
+    init: () => {
+        // 生成桌面图标
+        const desktop = document.getElementById('desktop');
+        Object.keys(AppList).forEach(key => {
+            if(key === 'snake' || key === 'code' || key === 'video') return; // 仅在开始菜单显示
+            const app = AppList[key];
+            const icon = document.createElement('div');
+            icon.className = 'desktop-icon';
+            icon.innerHTML = `<div class="icon-img">${app.icon}</div><div class="icon-label">${app.name}</div>`;
+            icon.ondblclick = () => appManager.open(key);
+            desktop.appendChild(icon);
+        });
+
+        // 时钟
+        setInterval(() => {
+            const d = new Date();
+            document.getElementById('clock').innerText = d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }, 1000);
+
+        // 开机动画
+        let progress = 0;
+        const bar = document.getElementById('loader-bar');
+        const text = document.getElementById('boot-text');
+        const screen = document.getElementById('boot-screen');
+        
+        const load = setInterval(() => {
+            progress += Math.random() * 10;
+            if(progress > 100) progress = 100;
+            bar.style.width = progress + '%';
+            
+            if(progress > 30 && progress < 60) text.innerText = "正在加载驱动程序...";
+            if(progress > 60 && progress < 90) text.innerText = "正在启动系统服务...";
+            if(progress >= 100) {
+                clearInterval(load);
+                text.innerText = "欢迎";
+                setTimeout(() => {
+                    screen.style.display = 'none';
+                    Sound.startup();
+                }, 800);
+            }
+        }, 100);
+    },
+    
+    toggleStartMenu: () => {
+        const menu = document.getElementById('start-menu');
+        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+    },
+    
+    shutdown: () => {
+        document.body.innerHTML = '';
+        document.body.style.background = '#000';
+        setTimeout(() => {
+            document.write('<h1 style="color:orange;font-family:sans-serif;text-align:center;margin-top:20%">现在可以安全地关闭计算机了。</h1>');
+        }, 1000);
+    }
+};
+
+// 点击其他地方关闭开始菜单
+document.body.addEventListener('click', (e) => {
+    const menu = document.getElementById('start-menu');
+    const btn = document.getElementById('start-btn');
+    if (!menu.contains(e.target) && !btn.contains(e.target)) {
+        menu.style.display = 'none';
+    }
+});
+
+// 启动系统
+system.init();
+
+</script>
+</body>
+</html>

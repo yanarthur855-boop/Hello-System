@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HowMany OS - Ultimate Web System</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* --- 全局变量与重置 --- */
+        :root {
+            --bg-color: #1a1a2e;
+            --taskbar-bg: rgba(22, 22, 29, 0.85);
+            --window-bg: rgba(255, 255, 255, 0.95);
+            --accent-color: #0078d4;
+            --text-color: #333;
+            --dark-text: #eee;
+            --glass-border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        * { box-sizing: border-box; user-select: none; }
+        body {
+            margin: 0; padding: 0; overflow: hidden;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: url('https://images.unsplash.com/photo-1579546929518-9e396f3cc809?ixlib=rb-4.0.3&q=85&fm=jpg&crop=entropy&cs=srgb&w=1920') no-repeat center center/cover;
+            height: 100vh; width: 100vw;
+            cursor: default;
+        }
+
+        /* --- 开机画面 --- */
+        #boot-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 9999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            color: white; transition: opacity 1s ease;
+        }
+        .boot-logo { font-size: 80px; margin-bottom: 20px; color: #00aaff; text-shadow: 0 0 20px #00aaff; }
+        .loader {
+            border: 4px solid #333; border-top: 4px solid #00aaff;
+            border-radius: 50%; width: 40px; height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* --- 桌面 --- */
+        #desktop {
+            width: 100%; height: calc(100% - 48px);
+            padding: 10px;
+            display: flex; flex-direction: column; flex-wrap: wrap; align-content: flex-start;
+            position: relative;
+        }
+        .desktop-icon {
+            width: 80px; height: 90px;
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center;
+            color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+            border-radius: 5px; cursor: pointer;
+            margin: 5px; transition: background 0.2s;
+        }
+        .desktop-icon:hover { background: rgba(255,255,255,0.1); }
+        .desktop-icon i { font-size: 36px; margin-bottom: 8px; }
+        .desktop-icon span { font-size: 12px; text-align: center; line-height: 1.2; }
+
+        /* --- 窗口系统 --- */
+        .window {
+            position: absolute; width: 600px; height: 400px;
+            background: var(--window-bg);
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            display: flex; flex-direction: column;
+            overflow: hidden; resize: both; min-width: 300px; min-height: 200px;
+            animation: popIn 0.2s ease-out;
+            border: var(--glass-border);
+            backdrop-filter: blur(10px);
+        }
+        @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        
+        .title-bar {
+            height: 32px; background: #f0f0f0;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 10px; cursor: default; select-user: none;
+            border-bottom: 1px solid #ddd;
+        }
+        .title-bar-text { font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 8px;}
+        .window-controls { display: flex; gap: 8px; }
+        .control-btn {
+            width: 12px; height: 12px; border-radius: 50%; cursor: pointer; display: inline-block;
+        }
+        .close-btn { background: #ff5f56; } .min-btn { background: #ffbd2e; } .max-btn { background: #27c93f; }
+
+        .window-content { flex: 1; overflow: auto; position: relative; background: #fff; }
+        
+        /* --- 任务栏 --- */
+        #taskbar {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 48px;
+            background: var(--taskbar-bg);
+            backdrop-filter: blur(15px);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 15px; z-index: 9000;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .start-btn {
+            font-size: 22px; color: #00aaff; cursor: pointer; padding: 8px;
+            transition: transform 0.2s;
+        }
+        .start-btn:hover { transform: scale(1.1); }
+        
+        .taskbar-apps { display: flex; gap: 8px; flex: 1; justify-content: center; }
+        .taskbar-icon {
+            width: 40px; height: 40px; border-radius: 5px;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 20px; cursor: pointer;
+            transition: background 0.2s; position: relative;
+        }
+        .taskbar-icon:hover { background: rgba(255,255,255,0.15); }
+        .taskbar-icon.active::after {
+            content: ''; position: absolute; bottom: 2px; width: 40%; height: 3px;
+            background: #00aaff; border-radius: 2px;
+        }
+
+        .system-tray { color: white; font-size: 12px; display: flex; gap: 15px; align-items: center; }
+
+        /* --- 开始菜单 --- */
+        #start-menu {
+            position: absolute; bottom: 55px; left: 10px;
+            width: 320px; height: 450px;
+            background: rgba(240, 240, 240, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.4);
+            display: none; flex-direction: column; padding: 20px;
+            z-index: 9001;
+            animation: slideUp 0.2s ease-out;
+        }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .start-header { font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #333; }
+        .start-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .start-item { display: flex; flex-direction: column; align-items: center; cursor: pointer; gap: 5px; }
+        .start-item i { font-size: 24px; color: #444; background: #fff; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .start-item span { font-size: 11px; color: #555; }
+
+        /* --- 应用特定样式 --- */
+        /* 终端 */
+        .terminal { background: #0c0c0c; color: #0f0; font-family: 'Consolas', monospace; padding: 10px; height: 100%; }
+        .terminal-output { white-space: pre-wrap; margin-bottom: 10px; }
+        .terminal-input-line { display: flex; }
+        .terminal-prompt { color: #00aaff; margin-right: 5px; }
+        .terminal-input { background: transparent; border: none; color: #fff; flex: 1; outline: none; font-family: inherit; }
+
+        /* 记事本 */
+        .notepad-area { width: 100%; height: 100%; border: none; padding: 10px; outline: none; resize: none; font-family: 'Consolas', sans-serif; font-size: 14px; }
+
+        /* 画图 */
+        .paint-toolbar { padding: 5px; background: #eee; display: flex; gap: 10px; align-items: center; border-bottom: 1px solid #ccc; }
+        .color-picker { width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 1px solid #999; }
+        #paint-canvas { display: block; background: #fff; cursor: crosshair; }
+
+        /* 文件管理 */
+        .file-explorer { display: flex; height: 100%; }
+        .sidebar { width: 120px; background: #f3f3f3; padding: 10px; border-right: 1px solid #ddd; }
+        .main-files { flex: 1; padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; align-content: start;}
+        .file-item { display: flex; flex-direction: column; align-items: center; cursor: pointer; padding: 5px; }
+        .file-item:hover { background: #e5f3ff; border-radius: 4px; }
+        .file-item i { font-size: 32px; color: #ffd04e; margin-bottom: 5px; }
+        .file-item.is-file i { color: #888; }
+        .file-item span { font-size: 12px; text-align: center; word-break: break-all;}
+
+        /* 贪吃蛇 */
+        .snake-game { background: #222; display: flex; justify-content: center; align-items: center; height: 100%; flex-direction: column; color: #fff; }
+        canvas#snakeCanvas { border: 2px solid #555; background: #000; }
+
+        /* 视频编辑器 */
+        .video-editor { display: flex; flex-direction: column; height: 100%; background: #222; color: #eee; }
+        .ve-preview { flex: 2; background: #000; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #444; }
+        .ve-timeline { flex: 1; background: #333; padding: 10px; position: relative; overflow-x: auto; }
+        .ve-track { height: 40px; background: #444; margin-bottom: 5px; border-radius: 4px; position: relative; }
+        .ve-clip { position: absolute; left: 20px; width: 100px; height: 100%; background: #0078d4; border-radius: 4px; border: 1px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 10px;}
+        .ve-controls { padding: 5px; background: #111; display: flex; justify-content: center; gap: 15px; }
+        .ve-btn { background: #444; border: none; color: white; padding: 5px 10px; cursor: pointer; border-radius: 3px; }
+
+        /* 代码编辑器 */
+        .code-editor { display: flex; height: 100%; background: #1e1e1e; color: #d4d4d4; }
+        .line-numbers { width: 30px; background: #252526; text-align: right; padding: 10px 5px; color: #858585; font-family: 'Consolas', monospace; font-size: 14px; line-height: 1.5; border-right: 1px solid #333;}
+        .code-area { flex: 1; background: transparent; color: inherit; border: none; padding: 10px; font-family: 'Consolas', monospace; font-size: 14px; line-height: 1.5; outline: none; resize: none; white-space: pre; }
+
+        /* 浏览器 (Fake) */
+        .browser-bar { display: flex; padding: 5px; background: #f0f0f0; border-bottom: 1px solid #ccc; gap: 5px; }
+        .url-input { flex: 1; padding: 4px 8px; border-radius: 15px; border: 1px solid #ccc; outline: none; font-size: 12px; }
+        .browser-content { flex: 1; background: #fff; padding: 20px; overflow: auto; }
+        .browser-frame { width: 100%; height: 100%; border: none; }
+    </style>
+</head>
+<body>
+
+    <!-- 开机画面 -->
+    <div id="boot-screen">
+        <div class="boot-logo"><i class="fa-brands fa-windows"></i></div>
+        <h2>HowMany OS</h2>
+        <div class="loader"></div>
+        <p style="margin-top: 20px; font-size: 12px; color: #888;">正在初始化系统组件...</p>
+    </div>
+
+    <!-- 桌面 -->
+    <div id="desktop" onclick="closeStartMenu()">
+        <!-- 桌面图标由 JS 生成 -->
+    </div>
+
+    <!-- 开始菜单 -->
+    <div id="start-menu" onclick="event.stopPropagation()">
+        <div class="start-header">开始菜单</div>
+        <div class="start-grid" id="start-grid-content">
+            <!-- 开始菜单项 -->
+        </div>
+        <div style="margin-top: auto; padding-top: 15px; border-top: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 30px; height: 30px; background: #ccc; border-radius: 50%; display: flex; justify-content: center; align-items: center;"><i class="fa-solid fa-user"></i></div>
+                <span style="font-size: 14px; font-weight: bold;">Administrator</span>
+            </div>
+            <i class="fa-solid fa-power-off" style="color: #333; cursor: pointer;" title="关机" onclick="shutdown()"></i>
+        </div>
+    </div>
+
+    <!-- 任务栏 -->
+    <div id="taskbar">
+        <div class="start-btn" onclick="toggleStartMenu(event)">
+            <i class="fa-brands fa-windows"></i>
+        </div>
+        <div class="taskbar-apps" id="taskbar-apps">
+            <!-- 运行中的应用图标 -->
+        </div>
+        <div class="system-tray">
+            <i class="fa-solid fa-wifi"></i>
+            <i class="fa-solid fa-volume-high"></i>
+            <span id="clock">12:00</span>
+            <i class="fa-regular fa-comment-dots"></i>
+        </div>
+    </div>
+
+<script>
+/* --- 系统内核与配置 --- */
+const System = {
+    apps: [
+        { id: 'computer', name: '我的电脑', icon: 'fa-solid fa-computer', type: 'app', action: 'openExplorer' },
+        { id: 'terminal', name: '系统终端', icon: 'fa-solid fa-terminal', type: 'app', action: 'openTerminal' },
+        { id: 'notepad', name: '记事本', icon: 'fa-solid fa-file-lines', type: 'app', action: 'openNotepad' },
+        { id: 'paint', name: '画图板', icon: 'fa-solid fa-palette', type: 'app', action: 'openPaint' },
+        { id: 'browser', name: '冲浪浏览器', icon: 'fa-brands fa-chrome', type: 'app', action: 'openBrowser' },
+        { id: 'vscode', name: '代码工坊', icon: 'fa-solid fa-code', type: 'app', action: 'openCode' },
+        { id: 'snake', name: '贪吃蛇', icon: 'fa-solid fa-gamepad', type: 'app', action: 'openSnake' },
+        { id: 'video', name: '剪辑师', icon: 'fa-solid fa-film', type: 'app', action: 'openVideo' },
+        { id: 'trash', name: '回收站', icon: 'fa-solid fa-trash-can', type: 'app', action: 'openTrash' },
+    ],
+    zIndexCounter: 100,
+    runningApps: {}, // { id: WindowElement }
+};
+
+/* --- 开机逻辑 --- */
+window.onload = () => {
+    setTimeout(() => {
+        playSound();
+        document.getElementById('boot-screen').style.opacity = '0';
+        setTimeout(() => {
+            document.getElementById('boot-screen').remove();
+            initDesktop();
+            initClock();
+        }, 1000);
+    }, 2000);
+};
+
+function playSound() {
+    // Web Audio API 开机音效 (C大调和弦)
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const notes = [261.63, 329.63, 392.00, 523.25]; // C4, E4, G4, C5
+    notes.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(i * 0.1);
+        gain.gain.setValueAtTime(0.1, ctx.currentTime + i * 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + i * 0.1 + 1.5);
+        osc.stop(ctx.currentTime + i * 0.1 + 1.5);
+    });
+}
+
+/* --- UI 初始化 --- */
+function initDesktop() {
+    const desktop = document.getElementById('desktop');
+    const startGrid = document.getElementById('start-grid-content');
+    
+    System.apps.forEach(app => {
+        // 桌面图标
+        const icon = document.createElement('div');
+        icon.className = 'desktop-icon';
+        icon.innerHTML = `<i class="${app.icon}" style="color: ${getColor(app.id)}"></i><span>${app.name}</span>`;
+        icon.ondblclick = () => window[app.action]();
+        desktop.appendChild(icon);
+
+        // 开始菜单项
+        const startItem = document.createElement('div');
+        startItem.className = 'start-item';
+        startItem.innerHTML = `<i class="${app.icon}" style="color: ${getColor(app.id)}"></i><span>${app.name}</span>`;
+        startItem.onclick = () => { window[app.action](); closeStartMenu(); };
+        startGrid.appendChild(startItem);
+    });
+}
+
+function getColor(id) {
+    const colors = { terminal: '#333', paint: '#ffbd2e', browser: '#27c93f', vscode: '#0078d4', snake: '#ff5f56' };
+    return colors[id] || '#00aaff';
+}
+
+function initClock() {
+    setInterval(() => {
+        const now = new Date();
+        document.getElementById('clock').innerText = now.toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
+    }, 1000);
+}
+
+/* --- 窗口管理器 (核心) --- */
+function createWindow(title, iconClass, contentHtml, width=600, height=400, id) {
+    // 如果应用已打开，置顶
+    if (System.runningApps[id]) {
+        focusWindow(System.runningApps[id]);
+        return System.runningApps[id];
+    }
+
+    System.zIndexCounter++;
+    const win = document.createElement('div');
+    win.className = 'window';
+    win.style.zIndex = System.zIndexCounter;
+    win.style.width = width + 'px';
+    win.style.height = height + 'px';
+    // 随机位置
+    win.style.top = (50 + Math.random() * 100) + 'px';
+    win.style.left = (50 + Math.random() * 100) + 'px';
+    
+    win.innerHTML = `
+        <div class="title-bar" onmousedown="startDrag(event, this.parentElement)">
+            <div class="title-bar-text"><i class="${iconClass}"></i> ${title}</div>
+            <div class="window-controls">
+                <div class="control-btn min-btn" onclick="minimizeWindow(this.parentElement.parentElement.parentElement)"></div>
+                <div class="control-btn max-btn" onclick="maximizeWindow(this.parentElement.parentElement.parentElement)"></div>
+                <div class="control-btn close-btn" onclick="closeWindow('${id}')"></div>
+            </div>
+        </div>
+        <div class="window-content">${contentHtml}</div>
+    `;
+
+    win.onmousedown = () => focusWindow(win);
+    document.getElementById('desktop').appendChild(win);
+    
+    // 任务栏图标
+    const taskIcon = document.createElement('div');
+    taskIcon.className = 'taskbar-icon active';
+    taskIcon.id = 'task-' + id;
+    taskIcon.innerHTML = `<i class="${iconClass}"></i>`;
+    taskIcon.onclick = () => {
+        if (win.style.display === 'none') {
+            win.style.display = 'flex';
+            focusWindow(win);
+        } else {
+            if (parseInt(win.style.zIndex) === System.zIndexCounter) {
+                win.style.display = 'none'; // 最小化
+                taskIcon.classList.remove('active');
+            } else {
+                focusWindow(win);
+            }
+        }
+    };
+    document.getElementById('taskbar-apps').appendChild(taskIcon);
+
+    System.runningApps[id] = win;
+    return win;
+}
+
+function closeWindow(id) {
+    const win = System.runningApps[id];
+    if (win) {
+        win.style.transition = 'all 0.2s';
+        win.style.opacity = '0';
+        win.style.transform = 'scale(0.9)';
+        setTimeout(() => {
+            win.remove();
+            delete System.runningApps[id];
+            document.getElementById('task-' + id).remove();
+        }, 200);
+    }
+}
+
+function focusWindow(win) {
+    System.zIndexCounter++;
+    win.style.zIndex = System.zIndexCounter;
+    const id = Object.keys(System.runningApps).find(key => System.runningApps[key] === win);
+    if(id) {
+        document.querySelectorAll('.taskbar-icon').forEach(i => i.classList.remove('active'));
+        document.getElementById('task-' + id).classList.add('active');
+    }
+}
+
+function minimizeWindow(win) {
+    win.style.display = 'none';
+    const id = Object.keys(System.runningApps).find(key => System.runningApps[key] === win);
+    if(id) document.getElementById('task-' + id).classList.remove('active');
+}
+
+function maximizeWindow(win) {
+    if (win.style.width === '100%') {
+        win.style.width = win.dataset.prevWidth;
+        win.style.height = win.dataset.prevHeight;
+        win.style.top = win.dataset.prevTop;
+        win.style.left = win.dataset.prevLeft;
+    } else {
+        win.dataset.prevWidth = win.style.width;
+        win.dataset.prevHeight = win.style.height;
+        win.dataset.prevTop = win.style.top;
+        win.dataset.prevLeft = win.style.left;
+        win.style.width = '100%';
+        win.style.height = '100%';
+        win.style.top = '0';
+        win.style.left = '0';
+    }
+}
+
+/* --- 拖拽逻辑 --- */
+let isDragging = false;
+let dragOffset = { x: 0, y: 0 };
+let currentWindow = null;
+
+function startDrag(e, win) {
+    if (e.target.classList.contains('control-btn')) return;
+    isDragging = true;
+    currentWindow = win;
+    focusWindow(win);
+    const rect = win.getBoundingClientRect();
+    dragOffset.x = e.clientX - rect.left;
+    dragOffset.y = e.clientY - rect.top;
+}
+
+document.onmousemove = (e) => {
+    if (isDragging && currentWindow) {
+        currentWindow.style.left = (e.clientX - dragOffset.x) + 'px';
+        currentWindow.style.top = (e.clientY - dragOffset.y) + 'px';
+    }
+};
+
+document.onmouseup = () => { isDragging = false; currentWindow = null; };
+
+/* --- 开始菜单 --- */
+function toggleStartMenu(e) {
+    e.stopPropagation();
+    const menu = document.getElementById('start-menu');
+    menu.style.display = menu.style.display === 'flex' ? 'none' : 'flex';
+}
+function closeStartMenu() { document.getElementById('start-menu').style.display = 'none'; }
+function shutdown() {
+    document.body.innerHTML = '<div style="width:100%;height:100vh;background:black;color:white;display:flex;justify-content:center;align-items:center;"><h1>正在关机...</h1></div>';
+    setTimeout(()=> window.close(), 2000);
+}
+
+/* ================= 应用实现 ================= */
+
+// 1. 终端 (Terminal)
+function openTerminal() {
+    const id = 'terminal';
+    const html = `
+        <div class="terminal" onclick="document.getElementById('term-input').focus()">
+            <div class="terminal-output" id="term-output">HowMany OS [版本 1.0.25]<br>(c) HowMany Corporation. 保留所有权利。<br><br>输入 'python' 进入 Python 模式，输入 'help' 查看帮助。<br><br></div>
+            <div class="terminal-input-line">
+                <span class="terminal-prompt" id="term-prompt">C:\\Users\\Admin></span>
+                <input type="text" class="terminal-input" id="term-input" autocomplete="off">
+            </div>
+        </div>`;
+    const win = createWindow('系统终端', 'fa-solid fa-terminal', html, 600, 400, id);
+    
+    const input = win.querySelector('#term-input');
+    const output = win.querySelector('#term-output');
+    const prompt = win.querySelector('#term-prompt');
+    let isPython = false;
+
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            const cmd = this.value.trim();
+            output.innerHTML += `<div><span style="color:${isPython?'#ffd04e':'#00aaff'}">${prompt.innerText}</span> ${cmd}</div>`;
+            this.value = '';
+            
+            if (isPython) {
+                if (cmd === 'exit()') {
+                    isPython = false;
+                    prompt.innerText = 'C:\\Users\\Admin>';
+                } else if (cmd.startsWith('print("') && cmd.endsWith('")')) {
+                     output.innerHTML += `<div>${cmd.substring(7, cmd.length-2)}</div>`;
+                } else if (/^\d+[\+\-\*\/]\d+$/.test(cmd)) {
+                    try { output.innerHTML += `<div>${eval(cmd)}</div>`; } catch{ output.innerHTML += `<div style="color:red">SyntaxError</div>`;}
+                } else {
+                    output.innerHTML += `<div>>>> ${cmd} (模拟执行成功)</div>`;
+                }
+            } else {
+                if (cmd === 'python') {
+                    isPython = true;
+                    prompt.innerText = '>>>';
+                    output.innerHTML += `<div>Python 3.9.0 (tags/v3.9.0:9cf6752, Oct  5 2020, 15:34:40) [MSC v.1927 64 bit (AMD64)] on win32</div>`;
+                } else if (cmd === 'help') {
+                    output.innerHTML += `<div>可用命令: dir, cls, date, python, echo [text]</div>`;
+                } else if (cmd === 'cls') {
+                    output.innerHTML = '';
+                } else if (cmd === 'date') {
+                    output.innerHTML += `<div>${new Date().toString()}</div>`;
+                } else if (cmd === 'dir') {
+                    output.innerHTML += `<div><br> 驱动器 C 中的卷是 OS<br> 目录<br><br>2023/10/25  10:00    &lt;DIR&gt;          Documents<br>2023/10/25  10:00    &lt;DIR&gt;          Downloads<br></div>`;
+                } else if (cmd !== '') {
+                    output.innerHTML += `<div style="color:red">'${cmd}' 不是内部或外部命令。</div>`;
+                }
+            }
+            win.querySelector('.window-content').scrollTop = win.querySelector('.window-content').scrollHeight;
+        }
+    });
+}
+
+// 2. 记事本
+function openNotepad() {
+    const html = `<textarea class="notepad-area" placeholder="在此输入文本..."></textarea>`;
+    createWindow('无标题 - 记事本', 'fa-solid fa-file-lines', html, 500, 400, 'notepad');
+}
+
+// 3. 画图 (Paint)
+let ctx, painting = false;
+function openPaint() {
+    const id = 'paint';
+    const html = `
+        <div class="paint-toolbar">
+            <div style="font-size:12px">颜色:</div>
+            <div class="color-picker" style="background:black" onclick="setColor('black')"></div>
+            <div class="color-picker" style="background:red" onclick="setColor('red')"></div>
+            <div class="color-picker" style="background:blue" onclick="setColor('blue')"></div>
+            <div class="color-picker" style="background:green" onclick="setColor('green')"></div>
+            <div class="color-picker" style="background:white" onclick="setColor('white')"></div>
+            <button onclick="clearCanvas()">清空</button>
+        </div>
+        <canvas id="paint-canvas" width="800" height="600"></canvas>
+    `;
+    const win = createWindow('画图板', 'fa-solid fa-palette', html, 700, 500, id);
+    
+    const canvas = win.querySelector('#paint-canvas');
+    ctx = canvas.getContext('2d');
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    
+    function startPosition(e) {
+        painting = true;
+        draw(e);
+    }
+    function finishedPosition() {
+        painting = false;
+        ctx.beginPath();
+    }
+    function draw(e) {
+        if (!painting) return;
+        const rect = canvas.getBoundingClientRect();
+        ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+    }
+    
+    canvas.addEventListener('mousedown', startPosition);
+    canvas.addEventListener('mouseup', finishedPosition);
+    canvas.addEventListener('mousemove', draw);
+}
+function setColor(c) { if(ctx) ctx.strokeStyle = c; }
+function clearCanvas() { if(ctx) ctx.clearRect(0,0,800,600); }
+
+// 4. 贪吃蛇 (Snake)
+let snakeGameLoop;
+function openSnake() {
+    const id = 'snake';
+    const html = `<div class="snake-game">
+        <div style="margin-bottom:10px;">分数: <span id="score">0</span></div>
+        <canvas id="snakeCanvas" width="400" height="300"></canvas>
+        <div style="margin-top:10px; font-size:12px; color:#888;">使用方向键控制，空格键开始/暂停</div>
+    </div>`;
+    const win = createWindow('贪吃蛇', 'fa-solid fa-gamepad', html, 440, 420, id);
+    
+    const canvas = win.querySelector('#snakeCanvas');
+    const ctx = canvas.getContext('2d');
+    const box = 20;
+    let snake = [{x: 9 * box, y: 10 * box}];
+    let food = { x: Math.floor(Math.random()*19+1) * box, y: Math.floor(Math.random()*14+1) * box };
+    let score = 0;
+    let d;
+    
+    document.addEventListener('keydown', direction);
+    function direction(event) {
+        if(event.keyCode == 37 && d != "RIGHT") d = "LEFT";
+        else if(event.keyCode == 38 && d != "DOWN") d = "UP";
+        else if(event.keyCode == 39 && d != "LEFT") d = "RIGHT";
+        else if(event.keyCode == 40 && d != "UP") d = "DOWN";
+    }
+    
+    function draw() {
+        if(!document.getElementById('snakeCanvas')) { clearInterval(snakeGameLoop); return; } // 窗口关闭停止循环
+        ctx.fillStyle = "#000"; ctx.fillRect(0, 0, 400, 300);
+        
+        for(let i = 0; i < snake.length; i++) {
+            ctx.fillStyle = (i == 0) ? "#00aaff" : "white";
+            ctx.fillRect(snake[i].x, snake[i].y, box, box);
+            ctx.strokeStyle = "black"; ctx.strokeRect(snake[i].x, snake[i].y, box, box);
+        }
+        
+        ctx.fillStyle = "red"; ctx.fillRect(food.x, food.y, box, box);
+        
+        let snakeX = snake[0].x;
+        let snakeY = snake[0].y;
+        
+        if(d == "LEFT") snakeX -= box;
+        if(d == "UP") snakeY -= box;
+        if(d == "RIGHT") snakeX += box;
+        if(d == "DOWN") snakeY += box;
+        
+        if(snakeX == food.x && snakeY == food.y) {
+            score++;
+            win.querySelector('#score').innerText = score;
+            food = { x: Math.floor(Math.random()*19) * box, y: Math.floor(Math.random()*14) * box };
+        } else {
+            snake.pop();
+        }
+        
+        let newHead = { x: snakeX, y: snakeY };
+        
+        if(snakeX < 0 || snakeX >= 400 || snakeY < 0 || snakeY >= 300 || collision(newHead, snake)) {
+            clearInterval(snakeGameLoop);
+            alert('游戏结束! 得分: ' + score);
+            return;
+        }
+        
+        snake.unshift(newHead);
+    }
+    
+    function collision(head, array) {
+        for(let i = 0; i < array.length; i++) { if(head.x == array[i].x && head.y == array[i].y) return true; }
+        return false;
+    }
+    
+    snakeGameLoop = setInterval(draw, 100);
+    
+    // 窗口关闭时清理事件
+    const originalClose = win.querySelector('.close-btn').onclick;
+    win.querySelector('.close-btn').onclick = () => {
+        clearInterval(snakeGameLoop);
+        closeWindow(id);
+    };
+}
+
+// 5. 代码工坊 (Code)
+function openCode() {
+    const html = `
+        <div class="code-editor">
+            <div class="line-numbers" id="line-numbers">1</div>
+            <textarea class="code-area" id="code-area" spellcheck="false" oninput="updateLines(this)">
+function helloWorld() {
+    console.log("Hello HowMany OS!");
+    return true;
+}</textarea>
+        </div>
+    `;
+    createWindow('代码工坊 - Project1.js', 'fa-solid fa-code', html, 700, 500, 'vscode');
+}
+function updateLines(textarea) {
+    const lines = textarea.value.split('\n').length;
+    document.getElementById('line-numbers').innerHTML = Array(lines).fill(0).map((_, i) => i + 1).join('<br>');
+}
+
+// 6. 文件资源管理器
+function openExplorer() {
+    const html = `
+        <div class="file-explorer">
+            <div class="sidebar">
+                <div class="file-item" style="align-items: flex-start; padding-left:0;"><i class="fa-solid fa-desktop" style="font-size:16px; color:#333;"></i> <span style="margin-left:5px">桌面</span></div>
+                <div class="file-item" style="align-items: flex-start; padding-left:0;"><i class="fa-solid fa-file" style="font-size:16px; color:#333;"></i> <span style="margin-left:5px">文档</span></div>
+                <div class="file-item" style="align-items: flex-start; padding-left:0;"><i class="fa-solid fa-download" style="font-size:16px; color:#333;"></i> <span style="margin-left:5px">下载</span></div>
+            </div>
+            <div class="main-files">
+                <div class="file-item"><i class="fa-solid fa-folder"></i><span>系统文件</span></div>
+                <div class="file-item"><i class="fa-solid fa-folder"></i><span>用户数据</span></div>
+                <div class="file-item"><i class="fa-solid fa-folder"></i><span>项目源码</span></div>
+                <div class="file-item is-file"><i class="fa-solid fa-file-word"></i><span>简历.docx</span></div>
+                <div class="file-item is-file"><i class="fa-solid fa-image"></i><span>照片.jpg</span></div>
+            </div>
+        </div>
+    `;
+    createWindow('我的电脑', 'fa-solid fa-computer', html, 650, 400, 'computer');
+}
+
+// 7. 视频编辑器 (Mock)
+function openVideo() {
+    const html = `
+        <div class="video-editor">
+            <div class="ve-preview">
+                <i class="fa-solid fa-play-circle" style="font-size: 50px; opacity: 0.5; cursor: pointer;"></i>
+            </div>
+            <div class="ve-controls">
+                <button class="ve-btn"><i class="fa-solid fa-backward"></i></button>
+                <button class="ve-btn"><i class="fa-solid fa-play"></i></button>
+                <button class="ve-btn"><i class="fa-solid fa-forward"></i></button>
+                <button class="ve-btn" style="background:#0078d4; margin-left:20px;" onclick="alert('渲染开始...\\n渲染完成！')">导出视频</button>
+            </div>
+            <div class="ve-timeline">
+                <div class="ve-track"><div class="ve-clip" style="left: 10px; width: 150px;">Intro.mp4</div><div class="ve-clip" style="left: 170px; width: 200px; background:#b4009e;">Main.mp4</div></div>
+                <div class="ve-track"><div class="ve-clip" style="left: 10px; width: 360px; background:#27c93f;">Audio_Track.mp3</div></div>
+            </div>
+        </div>
+    `;
+    createWindow('剪辑师 Pro', 'fa-solid fa-film', html, 800, 500, 'video');
+}
+
+// 8. 浏览器 (Fake)
+function openBrowser() {
+    const html = `
+        <div style="display:flex; flex-direction:column; height:100%;">
+            <div class="browser-bar">
+                <i class="fa-solid fa-arrow-left" style="color:#555; padding-top:4px;"></i>
+                <i class="fa-solid fa-arrow-rotate-right" style="color:#555; padding-top:4px;"></i>
+                <input class="url-input" value="https://www.howmany-os.com/welcome">
+            </div>
+            <div class="browser-content">
+                <h1>Welcome to the Web</h1>
+                <p>您现在正在浏览 HowMany OS 内部网络。</p>
+                <hr>
+                <h3>今日新闻</h3>
+                <ul>
+                    <li>HowMany OS 发布 1.0 版本，震惊业界。</li>
+                    <li>HTML 单文件系统成为新趋势。</li>
+                </ul>
+                <div style="margin-top:20px; width:100%; height:200px; background:#f0f0f0; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#aaa;">广告位招租</div>
+            </div>
+        </div>
+    `;
+    createWindow('冲浪浏览器', 'fa-brands fa-chrome', html, 800, 500, 'browser');
+}
+
+function openTrash() {
+    alert("回收站是空的。\n(其实只是还没做这个功能)");
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cat OS - 喵呜系统旗舰版</title>
+    <style>
+        :root {
+            --primary: #7c4dff;
+            --primary-dark: #3f1dcb;
+            --bg-color: #1a1a2e;
+            --taskbar-bg: rgba(255, 255, 255, 0.85);
+            --window-bg: rgba(255, 255, 255, 0.95);
+            --text-color: #333;
+            --glass: blur(15px) saturate(180%);
+        }
+
+        * { box-sizing: border-box; user-select: none; cursor: default; }
+        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background: #000; color: var(--text-color); }
+
+        /* --- 开机动画 --- */
+        #boot-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 9999; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; color: white;
+            transition: opacity 1s ease;
+        }
+        .cat-logo { font-size: 100px; animation: bounce 2s infinite; margin-bottom: 20px; }
+        .loader { width: 300px; height: 6px; background: #333; border-radius: 3px; overflow: hidden; }
+        .loader-bar { width: 0%; height: 100%; background: linear-gradient(90deg, #00c6ff, #0072ff); transition: width 3s ease-in-out; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+
+        /* --- 桌面环境 --- */
+        #desktop {
+            width: 100%; height: 100%;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="%23ff9a9e"/><path d="M0 100 L100 0" stroke="rgba(255,255,255,0.2)" stroke-width="5"/></svg>'), linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%);
+            background-size: cover; position: relative; display: none; opacity: 0; transition: opacity 1s;
+        }
+
+        /* 图标 */
+        .desktop-icons {
+            display: flex; flex-direction: column; flex-wrap: wrap;
+            height: 90%; width: fit-content; padding: 10px; gap: 10px;
+        }
+        .icon {
+            width: 80px; height: 90px; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            border-radius: 5px; transition: 0.2s; color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        }
+        .icon:hover { background: rgba(255,255,255,0.2); }
+        .icon-img { font-size: 40px; margin-bottom: 5px; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3)); }
+        .icon-label { font-size: 12px; text-align: center; line-height: 1.2; }
+
+        /* --- 窗口系统 --- */
+        .window {
+            position: absolute; background: var(--window-bg);
+            border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            display: flex; flex-direction: column; overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.5);
+            animation: popOpen 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            min-width: 200px; min-height: 150px;
+        }
+        @keyframes popOpen { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        
+        .title-bar {
+            height: 32px; background: #f0f0f0; display: flex; align-items: center;
+            justify-content: space-between; padding: 0 10px; border-bottom: 1px solid #ddd;
+        }
+        .win-title { font-size: 12px; font-weight: bold; display: flex; align-items: center; gap: 8px; }
+        .win-controls { display: flex; gap: 8px; }
+        .win-btn { width: 12px; height: 12px; border-radius: 50%; border: none; }
+        .close-btn { background: #ff5f56; } .min-btn { background: #ffbd2e; } .max-btn { background: #27c93f; }
+        .close-btn:hover { filter: brightness(0.8); }
+
+        .win-content { flex: 1; overflow: auto; position: relative; background: white; }
+
+        /* --- 任务栏 --- */
+        #taskbar {
+            position: absolute; bottom: 0; width: 100%; height: 48px;
+            background: var(--taskbar-bg); backdrop-filter: var(--glass);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 15px; z-index: 10000; border-top: 1px solid rgba(255,255,255,0.5);
+        }
+        .start-btn {
+            width: 40px; height: 40px; border-radius: 5px; display: flex;
+            align-items: center; justify-content: center; font-size: 24px;
+            transition: 0.2s;
+        }
+        .start-btn:hover { background: rgba(0,0,0,0.05); }
+        
+        .task-apps { flex: 1; display: flex; justify-content: center; gap: 8px; height: 100%; align-items: center; }
+        .task-icon {
+            width: 40px; height: 40px; border-radius: 5px; display: flex;
+            align-items: center; justify-content: center; font-size: 22px;
+            transition: 0.2s; position: relative;
+        }
+        .task-icon:hover { background: rgba(0,0,0,0.1); transform: translateY(-2px); }
+        .task-icon.active::after {
+            content: ''; position: absolute; bottom: 2px; width: 12px; height: 3px;
+            background: var(--primary); border-radius: 2px;
+        }
+
+        .system-tray { font-size: 12px; display: flex; gap: 15px; align-items: center; }
+
+        /* --- 开始菜单 --- */
+        #start-menu {
+            position: absolute; bottom: 55px; left: 50%; transform: translateX(-50%);
+            width: 500px; height: 400px; background: rgba(240, 240, 240, 0.95);
+            backdrop-filter: var(--glass); border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+            display: none; flex-direction: column; padding: 20px; z-index: 10001;
+            border: 1px solid white;
+        }
+        #start-menu.show { display: flex; animation: slideUp 0.2s ease-out; }
+        @keyframes slideUp { from { transform: translate(-50%, 20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+        .start-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; margin-top: 20px; }
+        .start-item { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 11px; }
+        .start-item:hover { background: rgba(0,0,0,0.05); border-radius: 5px; }
+        .start-search {
+            width: 100%; padding: 8px 15px; border-radius: 20px; border: 1px solid #ccc;
+            outline: none; background: white;
+        }
+
+        /* --- APP 特定样式 --- */
+        /* 终端 */
+        .terminal { background: #1e1e1e; color: #0f0; font-family: 'Consolas', monospace; padding: 10px; height: 100%; font-size: 14px; }
+        .cmd-input { background: transparent; border: none; color: #0f0; outline: none; width: 80%; font-family: inherit; }
+        
+        /* 记事本 & 代码编辑器 */
+        textarea.editor { width: 100%; height: 100%; border: none; resize: none; padding: 10px; outline: none; font-family: monospace; }
+        .code-ide { background: #282c34; color: #abb2bf; }
+        
+        /* 画板 */
+        .paint-tools { height: 30px; background: #eee; display: flex; gap: 5px; align-items: center; padding: 0 5px; }
+        .color-btn { width: 20px; height: 20px; border-radius: 50%; border: 1px solid #999; }
+        
+        /* 文件管理器 */
+        .file-explorer { display: flex; height: 100%; }
+        .sidebar { width: 120px; background: #f3f3f3; border-right: 1px solid #ddd; padding: 10px; font-size: 12px; }
+        .file-area { flex: 1; padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, 80px); grid-auto-rows: 90px; gap: 5px; }
+        .file-item { display: flex; flex-direction: column; align-items: center; padding: 5px; }
+        .file-item:hover { background: #e5f3ff; border: 1px solid #cce8ff; border-radius: 3px; }
+
+        /* 游戏 (贪吃蛇) */
+        canvas.game-canvas { background: #222; display: block; margin: 0 auto; }
+        .game-score { text-align: center; font-weight: bold; padding: 5px; background: #eee; }
+
+        /* 视频编辑器 UI */
+        .video-timeline { display: flex; flex-direction: column; height: 100%; background: #333; color: white; }
+        .preview-area { height: 50%; background: black; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #555; }
+        .tracks-area { flex: 1; position: relative; overflow-x: auto; padding: 10px; background: #222; }
+        .track { height: 40px; background: #444; margin-bottom: 5px; position: relative; border-radius: 4px; }
+        .clip { position: absolute; height: 100%; background: #7c4dff; border-radius: 4px; border: 1px solid rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: grab; }
+
+        /* 右键菜单 */
+        #context-menu {
+            position: absolute; width: 150px; background: white;
+            box-shadow: 2px 2px 10px rgba(0,0,0,0.2); border-radius: 5px;
+            display: none; flex-direction: column; z-index: 20000; padding: 5px 0;
+        }
+        .ctx-item { padding: 8px 15px; font-size: 12px; cursor: pointer; }
+        .ctx-item:hover { background: #eee; }
+        .ctx-line { height: 1px; background: #ddd; margin: 2px 0; }
+
+    </style>
+</head>
+<body>
+
+    <!-- 开机画面 -->
+    <div id="boot-screen" onclick="startOS()">
+        <div class="cat-logo">😺</div>
+        <h2>Cat OS</h2>
+        <p style="font-size: 12px; opacity: 0.7; margin-bottom: 20px;">点击屏幕启动系统...</p>
+        <div class="loader">
+            <div class="loader-bar" id="boot-bar"></div>
+        </div>
+    </div>
+
+    <!-- 桌面 -->
+    <div id="desktop">
+        <div class="desktop-icons" id="desktop-icons-container">
+            <!-- 图标由JS生成 -->
+        </div>
+        
+        <!-- 开始菜单 -->
+        <div id="start-menu">
+            <input type="text" class="start-search" placeholder="搜索应用、文件和猫粮...">
+            <div style="margin-top: 10px; font-weight: bold; font-size: 12px; color: #666;">已固定</div>
+            <div class="start-grid" id="start-grid"></div>
+            <div style="margin-top: auto; padding-top: 10px; border-top: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 30px; height: 30px; background: #ccc; border-radius: 50%; display: flex; align-items: center; justify-content: center;">👤</div>
+                    <span style="font-size: 12px;">管理员猫</span>
+                </div>
+                <div style="font-size: 18px; cursor: pointer;" onclick="location.reload()" title="关机">🛑</div>
+            </div>
+        </div>
+
+        <!-- 任务栏 -->
+        <div id="taskbar">
+            <div class="start-btn" onclick="toggleStartMenu()">🐾</div>
+            <div class="task-apps" id="taskbar-apps"></div>
+            <div class="system-tray">
+                <span>📶</span>
+                <span>🔊</span>
+                <span id="clock">12:00</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右键菜单 -->
+    <div id="context-menu">
+        <div class="ctx-item" onclick="alert('刷新完成！')">刷新 (Refresh)</div>
+        <div class="ctx-line"></div>
+        <div class="ctx-item" onclick="createWindow('notepad')">新建文本文档</div>
+        <div class="ctx-item" onclick="changeWallpaper()">更换壁纸</div>
+        <div class="ctx-line"></div>
+        <div class="ctx-item" onclick="alert('属性：这也是一只猫。')">属性</div>
+    </div>
+
+<script>
+    // --- 系统配置与状态 ---
+    let zIndexCounter = 100;
+    const activeWindows = [];
+    let bootSoundPlayed = false;
+
+    // --- 应用定义 ---
+    const apps = {
+        'computer': { name: '此电脑', icon: '💻', type: 'app', action: 'fileManager' },
+        'notepad': { name: '记事本', icon: '📝', type: 'app', action: 'notepad' },
+        'terminal': { name: '终端', icon: '📟', type: 'app', action: 'terminal' },
+        'browser': { name: 'Catgle', icon: '🌐', type: 'app', action: 'browser' },
+        'paint': { name: '画图', icon: '🎨', type: 'app', action: 'paint' },
+        'game': { name: '贪吃蛇', icon: '🐍', type: 'app', action: 'game' },
+        'vscode': { name: 'Code', icon: '🛠️', type: 'app', action: 'vscode' },
+        'video': { name: '剪辑喵', icon: '🎬', type: 'app', action: 'videoEditor' },
+        'trash': { name: '回收站', icon: '🗑️', type: 'app', action: () => alert('猫猫把回收站吃掉了！') },
+        'settings': { name: '设置', icon: '⚙️', type: 'app', action: () => changeWallpaper() }
+    };
+
+    // --- 开机逻辑 ---
+    function startOS() {
+        if(bootSoundPlayed) return;
+        bootSoundPlayed = true;
+        
+        // 播放声音 (Web Audio API)
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+        
+        // 简单的合成器旋律
+        const playNote = (freq, time, duration) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.frequency.value = freq;
+            osc.type = 'sine';
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(time);
+            gain.gain.setValueAtTime(0.3, time);
+            gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+            osc.stop(time + duration);
+        };
+        
+        const now = audioCtx.currentTime;
+        playNote(523.25, now, 0.5); // C5
+        playNote(659.25, now + 0.2, 0.5); // E5
+        playNote(783.99, now + 0.4, 1.0); // G5
+        playNote(1046.50, now + 0.6, 1.5); // C6
+
+        // 动画
+        const bar = document.getElementById('boot-bar');
+        bar.style.width = '100%';
+        
+        setTimeout(() => {
+            document.getElementById('boot-screen').style.opacity = 0;
+            setTimeout(() => {
+                document.getElementById('boot-screen').style.display = 'none';
+                const desktop = document.getElementById('desktop');
+                desktop.style.display = 'block';
+                setTimeout(() => desktop.style.opacity = 1, 50);
+                initDesktop();
+            }, 1000);
+        }, 2500);
+    }
+
+    // --- 初始化桌面 ---
+    function initDesktop() {
+        const desktopContainer = document.getElementById('desktop-icons-container');
+        const startGrid = document.getElementById('start-grid');
+        
+        // 生成桌面图标和开始菜单图标
+        Object.keys(apps).forEach(key => {
+            const app = apps[key];
+            
+            // 桌面图标
+            if (key !== 'settings') { // 不把设置放在桌面
+                const iconDiv = document.createElement('div');
+                iconDiv.className = 'icon';
+                iconDiv.innerHTML = `<div class="icon-img">${app.icon}</div><div class="icon-label">${app.name}</div>`;
+                iconDiv.ondblclick = () => openApp(key);
+                desktopContainer.appendChild(iconDiv);
+            }
+
+            // 开始菜单图标
+            const startItem = document.createElement('div');
+            startItem.className = 'start-item';
+            startItem.innerHTML = `<div class="icon-img" style="font-size:24px">${app.icon}</div><div>${app.name}</div>`;
+            startItem.onclick = () => { openApp(key); toggleStartMenu(); };
+            startGrid.appendChild(startItem);
+        });
+
+        updateClock();
+        setInterval(updateClock, 1000);
+    }
+
+    // --- 窗口系统核心 ---
+    function openApp(appKey) {
+        const app = apps[appKey];
+        if (typeof app.action === 'function') {
+            app.action();
+        } else if (typeof app.action === 'string') {
+            createWindow(appKey);
+        }
+    }
+
+    function createWindow(appKey) {
+        const app = apps[appKey];
+        const id = 'win-' + Date.now();
+        zIndexCounter++;
+
+        const win = document.createElement('div');
+        win.className = 'window';
+        win.id = id;
+        win.style.zIndex = zIndexCounter;
+        win.style.left = (100 + activeWindows.length * 30) + 'px';
+        win.style.top = (50 + activeWindows.length * 30) + 'px';
+        win.style.width = appKey === 'video' ? '700px' : (appKey === 'game' ? '420px' : '600px');
+        win.style.height = appKey === 'video' ? '500px' : (appKey === 'game' ? '500px' : '400px');
+
+        // 窗口内容生成
+        let contentHtml = '';
+        switch(app.action) {
+            case 'notepad':
+                contentHtml = `<textarea class="editor" placeholder="在这里输入喵..."></textarea>`;
+                break;
+            case 'terminal':
+                contentHtml = `
+                    <div class="terminal" id="term-${id}" onclick="document.getElementById('in-${id}').focus()">
+                        <div>Cat OS [版本 10.0.19043]</div>
+                        <div>(c) Meow Corporation. 保留所有权利。</div>
+                        <br>
+                        <div id="history-${id}"></div>
+                        <span>C:\\Users\\Cat></span> <input id="in-${id}" class="cmd-input" type="text" autocomplete="off">
+                    </div>`;
+                break;
+            case 'browser':
+                contentHtml = `
+                    <div style="display:flex; flex-direction:column; height:100%;">
+                        <div style="padding:5px; background:#ddd; display:flex; gap:5px;">
+                            <button>🔙</button><button>🔜</button>
+                            <input type="text" value="https://catgle.com" style="flex:1; border-radius:3px; border:1px solid #999; padding:2px;">
+                        </div>
+                        <iframe src="about:blank" style="flex:1; border:none; background:white;" id="browser-${id}"></iframe>
+                    </div>`;
+                // 模拟浏览器内容
+                setTimeout(() => {
+                    const doc = document.getElementById(`browser-${id}`).contentWindow.document;
+                    doc.write(`<div style="display:flex;flex-direction:column;align-items:center;margin-top:50px;font-family:sans-serif;">
+                        <h1 style="font-size:50px;color:#4285f4;">Cat<span style="color:#ea4335">g</span><span style="color:#fbbc05">l</span><span style="color:#34a853">e</span></h1>
+                        <input type="text" style="width:400px;padding:10px;border-radius:20px;border:1px solid #ccc;" placeholder="搜索猫罐头...">
+                        <div style="margin-top:20px;">
+                            <button style="padding:8px 15px;">Catgle 搜索</button>
+                            <button style="padding:8px 15px;">手气不错</button>
+                        </div>
+                    </div>`);
+                }, 100);
+                break;
+            case 'vscode':
+                contentHtml = `<textarea class="editor code-ide" spellcheck="false">
+function meow() {
+    console.log("Hello World!");
+    return "🐟";
+}
+
+// TODO: 买更多猫粮
+</textarea>`;
+                break;
+            case 'paint':
+                contentHtml = `
+                    <div style="height:100%; display:flex; flex-direction:column;">
+                        <div class="paint-tools">
+                            <div class="color-btn" style="background:black" onclick="setPaintColor('${id}', 'black')"></div>
+                            <div class="color-btn" style="background:red" onclick="setPaintColor('${id}', 'red')"></div>
+                            <div class="color-btn" style="background:blue" onclick="setPaintColor('${id}', 'blue')"></div>
+                            <div class="color-btn" style="background:green" onclick="setPaintColor('${id}', 'green')"></div>
+                            <button onclick="clearPaint('${id}')">清空</button>
+                        </div>
+                        <canvas id="cvs-${id}" style="flex:1; background:white; cursor:crosshair; width:100%; height:100%;"></canvas>
+                    </div>`;
+                break;
+            case 'game':
+                contentHtml = `
+                    <div style="height:100%; display:flex; flex-direction:column; background:#333; color:white;">
+                        <div class="game-score" id="score-${id}">得分: 0</div>
+                        <canvas id="game-${id}" class="game-canvas" width="400" height="400"></canvas>
+                        <div style="text-align:center; padding:5px; font-size:12px; color:#aaa;">使用方向键控制</div>
+                        <button onclick="startGame('${id}')" style="margin:5px;">开始游戏</button>
+                    </div>`;
+                break;
+            case 'fileManager':
+                contentHtml = `
+                    <div class="file-explorer">
+                        <div class="sidebar">
+                            <div>📁 快速访问</div>
+                            <div style="margin-left:10px">🖥️ 桌面</div>
+                            <div style="margin-left:10px">⬇️ 下载</div>
+                            <div style="margin-left:10px">🎵 音乐</div>
+                            <br>
+                            <div>💻 此电脑</div>
+                            <div style="margin-left:10px">💿 本地磁盘 (C:)</div>
+                        </div>
+                        <div class="file-area">
+                            <div class="file-item"><div style="font-size:30px">📁</div><div>Windows</div></div>
+                            <div class="file-item"><div style="font-size:30px">📁</div><div>Program Files</div></div>
+                            <div class="file-item"><div style="font-size:30px">📁</div><div>Users</div></div>
+                            <div class="file-item"><div style="font-size:30px">📄</div><div>secret.txt</div></div>
+                            <div class="file-item"><div style="font-size:30px">📷</div><div>cat.png</div></div>
+                        </div>
+                    </div>`;
+                break;
+            case 'videoEditor':
+                contentHtml = `
+                    <div class="video-timeline">
+                        <div class="preview-area">
+                            <div>[视频预览窗口] <br> 🎬 1080p 60fps</div>
+                        </div>
+                        <div style="padding:5px; background:#444;">
+                             <button>▶️</button> <button>⏹️</button> <button>✂️</button>
+                        </div>
+                        <div class="tracks-area">
+                            <div class="track">
+                                <div class="clip" style="width:100px; left:10px;" onmousedown="dragClip(event)">Intro.mp4</div>
+                                <div class="clip" style="width:200px; left:120px; background:#27c93f;" onmousedown="dragClip(event)">GamePlay.mp4</div>
+                            </div>
+                            <div class="track">
+                                <div class="clip" style="width:150px; left:50px; background:#ffbd2e;" onmousedown="dragClip(event)">BGM.mp3</div>
+                            </div>
+                        </div>
+                    </div>`;
+                break;
+            default:
+                contentHtml = '<div style="padding:20px;">App content area</div>';
+        }
+
+        win.innerHTML = `
+            <div class="title-bar" onmousedown="startDrag(event, '${id}')">
+                <div class="win-title">${app.icon} ${app.name}</div>
+                <div class="win-controls">
+                    <button class="win-btn min-btn" onclick="minimizeWindow('${id}')"></button>
+                    <button class="win-btn max-btn" onclick="maximizeWindow('${id}')"></button>
+                    <button class="win-btn close-btn" onclick="closeWindow('${id}')"></button>
+                </div>
+            </div>
+            <div class="win-content">${contentHtml}</div>
+        `;
+
+        document.getElementById('desktop').appendChild(win);
+        activeWindows.push(id);
+        
+        // 添加到任务栏
+        addToTaskbar(id, app);
+
+        // 窗口点击置顶
+        win.addEventListener('mousedown', () => focusWindow(id));
+        focusWindow(id);
+
+        // 初始化特定功能
+        if (app.action === 'terminal') initTerminal(id);
+        if (app.action === 'paint') initPaint(id);
+    }
+
+    function closeWindow(id) {
+        const win = document.getElementById(id);
+        win.style.transform = 'scale(0.8)';
+        win.style.opacity = '0';
+        setTimeout(() => win.remove(), 200);
+        
+        const index = activeWindows.indexOf(id);
+        if (index > -1) activeWindows.splice(index, 1);
+        document.getElementById('task-icon-' + id).remove();
+    }
+
+    function maximizeWindow(id) {
+        const win = document.getElementById(id);
+        if (win.style.width === '100%') {
+            win.style.width = '600px';
+            win.style.height = '400px';
+            win.style.top = '100px';
+            win.style.left = '100px';
+        } else {
+            win.style.width = '100%';
+            win.style.height = 'calc(100% - 48px)';
+            win.style.top = '0';
+            win.style.left = '0';
+        }
+    }
+
+    function minimizeWindow(id) {
+        const win = document.getElementById(id);
+        win.style.display = 'none';
+        document.getElementById('task-icon-' + id).classList.remove('active');
+    }
+
+    function focusWindow(id) {
+        const win = document.getElementById(id);
+        if (win) {
+            zIndexCounter++;
+            win.style.zIndex = zIndexCounter;
+            win.style.display = 'flex';
+            
+            // 更新任务栏状态
+            document.querySelectorAll('.task-icon').forEach(el => el.classList.remove('active'));
+            const taskIcon = document.getElementById('task-icon-' + id);
+            if(taskIcon) taskIcon.classList.add('active');
+        }
+    }
+
+    function addToTaskbar(id, app) {
+        const container = document.getElementById('taskbar-apps');
+        const icon = document.createElement('div');
+        icon.className = 'task-icon active';
+        icon.id = 'task-icon-' + id;
+        icon.innerHTML = app.icon;
+        icon.onclick = () => {
+            const win = document.getElementById(id);
+            if (win.style.display === 'none') {
+                focusWindow(id);
+            } else if (win.style.zIndex == zIndexCounter) {
+                minimizeWindow(id);
+            } else {
+                focusWindow(id);
+            }
+        };
+        container.appendChild(icon);
+    }
+
+    // --- 窗口拖拽逻辑 ---
+    let dragInfo = { active: false, winId: null, offsetX: 0, offsetY: 0 };
+
+    function startDrag(e, id) {
+        dragInfo.active = true;
+        dragInfo.winId = id;
+        const win = document.getElementById(id);
+        dragInfo.offsetX = e.clientX - win.offsetLeft;
+        dragInfo.offsetY = e.clientY - win.offsetTop;
+        focusWindow(id);
+    }
+
+    document.addEventListener('mousemove', (e) => {
+        if (dragInfo.active) {
+            const win = document.getElementById(dragInfo.winId);
+            // 防止拖出屏幕
+            let newTop = e.clientY - dragInfo.offsetY;
+            if(newTop < 0) newTop = 0;
+            win.style.left = (e.clientX - dragInfo.offsetX) + 'px';
+            win.style.top = newTop + 'px';
+        }
+    });
+
+    document.addEventListener('mouseup', () => {
+        dragInfo.active = false;
+    });
+
+    // --- 终端逻辑 ---
+    function initTerminal(id) {
+        const input = document.getElementById(`in-${id}`);
+        const history = document.getElementById(`history-${id}`);
+        
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const cmd = input.value.trim();
+                history.innerHTML += `<div>C:\\Users\\Cat> ${cmd}</div>`;
+                
+                let response = "";
+                switch(cmd.toLowerCase()) {
+                    case 'help': response = "可用命令: help, ver, date, cat, clear, exit"; break;
+                    case 'ver': response = "Cat OS [Version 1.0.0]"; break;
+                    case 'date': response = new Date().toString(); break;
+                    case 'cat': response = " /\\_/\\\n( o.o )\n > ^ <"; break;
+                    case 'clear': history.innerHTML = ""; response = null; break;
+                    case 'exit': closeWindow(id); response = null; break;
+                    case '': response = null; break;
+                    default: response = `'${cmd}' 不是内部或外部命令，也不是可运行的程序。`;
+                }
+                
+                if(response) history.innerHTML += `<div style="margin-bottom:10px; white-space:pre;">${response}</div>`;
+                input.value = "";
+                const term = document.getElementById(`term-${id}`);
+                term.scrollTop = term.scrollHeight;
+            }
+        });
+        input.focus();
+    }
+
+    // --- 画板逻辑 ---
+    let paintState = {};
+    function initPaint(id) {
+        const canvas = document.getElementById(`cvs-${id}`);
+        const ctx = canvas.getContext('2d');
+        
+        // 修复canvas大小
+        const rect = canvas.parentElement.getBoundingClientRect();
+        canvas.width = rect.width;
+        canvas.height = rect.height - 30;
+        
+        paintState[id] = { drawing: false, color: 'black' };
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+
+        canvas.addEventListener('mousedown', (e) => {
+            paintState[id].drawing = true;
+            ctx.beginPath();
+            ctx.moveTo(e.offsetX, e.offsetY);
+        });
+        canvas.addEventListener('mousemove', (e) => {
+            if(paintState[id].drawing) {
+                ctx.strokeStyle = paintState[id].color;
+                ctx.lineTo(e.offsetX, e.offsetY);
+                ctx.stroke();
+            }
+        });
+        canvas.addEventListener('mouseup', () => paintState[id].drawing = false);
+    }
+
+    function setPaintColor(id, color) { paintState[id].color = color; }
+    function clearPaint(id) {
+        const cvs = document.getElementById(`cvs-${id}`);
+        const ctx = cvs.getContext('2d');
+        ctx.clearRect(0,0,cvs.width,cvs.height);
+    }
+
+    // --- 游戏逻辑 (贪吃蛇) ---
+    let gameIntervals = {};
+    function startGame(id) {
+        const canvas = document.getElementById(`game-${id}`);
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById(`score-${id}`);
+        
+        if(gameIntervals[id]) clearInterval(gameIntervals[id]);
+
+        let snake = [{x: 10, y: 10}];
+        let food = {x: 15, y: 15};
+        let dx = 1, dy = 0;
+        let score = 0;
+        const tile = 20;
+        const w = canvas.width / tile;
+        const h = canvas.height / tile;
+
+        // 键盘监听 (针对该窗口)
+        // 这里为了简单，使用全局监听但判断焦点窗口
+        // 实际应用应该绑定在canvas上并获焦
+        const keyHandler = (e) => {
+            // 仅当该窗口是最上层时响应
+            if(document.getElementById(id).style.zIndex != zIndexCounter) return;
+            switch(e.key) {
+                case 'ArrowUp': if(dy!==1) {dx=0; dy=-1;} break;
+                case 'ArrowDown': if(dy!==-1) {dx=0; dy=1;} break;
+                case 'ArrowLeft': if(dx!==1) {dx=-1; dy=0;} break;
+                case 'ArrowRight': if(dx!==-1) {dx=1; dy=0;} break;
+            }
+        };
+        document.addEventListener('keydown', keyHandler);
+
+        gameIntervals[id] = setInterval(() => {
+            const head = {x: snake[0].x + dx, y: snake[0].y + dy};
+
+            if(head.x < 0 || head.x >= w || head.y < 0 || head.y >= h || snake.some(s=>s.x===head.x && s.y===head.y)) {
+                clearInterval(gameIntervals[id]);
+                alert('游戏结束! 得分: ' + score);
+                document.removeEventListener('keydown', keyHandler);
+                return;
+            }
+
+            snake.unshift(head);
+            if(head.x === food.x && head.y === food.y) {
+                score += 10;
+                scoreEl.innerText = "得分: " + score;
+                food = {x: Math.floor(Math.random()*w), y: Math.floor(Math.random()*h)};
+            } else {
+                snake.pop();
+            }
+
+            // 绘制
+            ctx.fillStyle = '#222';
+            ctx.fillRect(0,0,canvas.width, canvas.height);
+            
+            ctx.fillStyle = 'lime';
+            snake.forEach(s => ctx.fillRect(s.x*tile, s.y*tile, tile-2, tile-2));
+            
+            ctx.fillStyle = 'red';
+            ctx.fillRect(food.x*tile, food.y*tile, tile-2, tile-2);
+        }, 100);
+    }
+
+    // --- 视频剪辑拖拽模拟 ---
+    function dragClip(e) {
+        e.stopPropagation();
+        const el = e.target;
+        const startX = e.clientX - el.offsetLeft;
+        
+        function move(ev) {
+            el.style.left = (ev.clientX - startX) + 'px';
+        }
+        function stop() {
+            document.removeEventListener('mousemove', move);
+            document.removeEventListener('mouseup', stop);
+        }
+        document.addEventListener('mousemove', move);
+        document.addEventListener('mouseup', stop);
+    }
+
+    // --- 系统功能 ---
+    function toggleStartMenu() {
+        const menu = document.getElementById('start-menu');
+        menu.classList.toggle('show');
+    }
+
+    // 点击桌面关闭开始菜单
+    document.getElementById('desktop').addEventListener('click', (e) => {
+        if (!e.target.closest('#start-menu') && !e.target.closest('.start-btn')) {
+            document.getElementById('start-menu').classList.remove('show');
+        }
+    });
+
+    // 右键菜单
+    document.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const menu = document.getElementById('context-menu');
+        menu.style.display = 'flex';
+        menu.style.left = e.clientX + 'px';
+        menu.style.top = e.clientY + 'px';
+    });
+
+    document.addEventListener('click', () => {
+        document.getElementById('context-menu').style.display = 'none';
+    });
+
+    function updateClock() {
+        const now = new Date();
+        const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+        document.getElementById('clock').innerText = timeStr;
+    }
+
+    function changeWallpaper() {
+        const colors = [
+            'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)',
+            'linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%)',
+            'linear-gradient(to top, #30cfd0 0%, #330867 100%)',
+            'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\'><circle cx=\'50\' cy=\'50\' r=\'40\' fill=\'%23333\'/></svg>")' // 极简黑模式
+        ];
+        const random = colors[Math.floor(Math.random() * colors.length)];
+        document.getElementById('desktop').style.background = random;
+        document.getElementById('desktop').style.backgroundSize = 'cover';
+    }
+
+</script>
+</body>
+</html>

@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Windows XP - Horror Edition</title>
+    <style>
+        /* --- 全局设置与字体 --- */
+        :root {
+            --xp-blue: #0053e1;
+            --xp-bar: #245edb;
+            --xp-bg: #3a6ea5;
+            --horror-red: #8a0000;
+            --horror-dark: #0a0a0a;
+            --crt-scanline: rgba(18, 16, 16, 0.1);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Tahoma', 'Segoe UI', sans-serif;
+            background-color: #000;
+            user-select: none;
+            cursor: default;
+        }
+
+        /* --- CRT & Glitch 效果 --- */
+        #screen-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.6;
+            animation: flicker 0.15s infinite;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.55; }
+            50% { opacity: 0.6; }
+            100% { opacity: 0.55; }
+        }
+
+        .glitch-text {
+            animation: glitch 1s linear infinite;
+        }
+
+        @keyframes glitch {
+            2%, 64% { transform: translate(2px,0) skew(0deg); }
+            4%, 60% { transform: translate(-2px,0) skew(0deg); }
+            62% { transform: translate(0,0) skew(5deg); }
+        }
+
+        /* --- 开机动画 --- */
+        #boot-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            font-family: 'Courier New', monospace;
+        }
+
+        #boot-logo {
+            font-size: 40px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: var(--horror-red);
+            text-shadow: 2px 2px #fff;
+        }
+
+        #loading-bar-container {
+            width: 200px;
+            height: 15px;
+            border: 1px solid #555;
+            padding: 2px;
+        }
+        #loading-bar {
+            width: 0%;
+            height: 100%;
+            background: var(--xp-blue);
+            transition: width 3s;
+        }
+
+        /* --- 桌面环境 --- */
+        #desktop {
+            width: 100%;
+            height: calc(100% - 30px);
+            /* 腐坏的 Bliss 壁纸模拟 */
+            background: linear-gradient(to bottom, #1e2b4d 0%, #4a3b3b 60%, #2b1818 100%);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            flex-wrap: wrap;
+            align-content: flex-start;
+            padding: 10px;
+        }
+
+        .desktop-icon {
+            width: 70px;
+            height: 80px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #ddd;
+            text-shadow: 1px 1px 2px #000;
+            margin: 10px;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+        .desktop-icon:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .icon-img {
+            font-size: 32px;
+            margin-bottom: 5px;
+            filter: sepia(1) hue-rotate(-50deg) contrast(1.2);
+        }
+
+        /* --- 任务栏 --- */
+        #taskbar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 30px;
+            background: linear-gradient(to bottom, #245edb 0%, #0139b5 100%);
+            display: flex;
+            align-items: center;
+            z-index: 5000;
+            border-top: 2px solid #3f86f6;
+        }
+
+        #start-btn {
+            width: 100px;
+            height: 100%;
+            background: linear-gradient(to bottom, #3c9642 0%, #276e2c 100%);
+            border-radius: 0 15px 15px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-style: italic;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+            cursor: pointer;
+            text-shadow: 1px 1px 2px #000;
+        }
+        #start-btn:hover { filter: brightness(1.1); }
+
+        .taskbar-item {
+            width: 150px;
+            height: 24px;
+            background: #1d4ebf;
+            margin-left: 5px;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            padding: 0 5px;
+            color: white;
+            font-size: 12px;
+            cursor: pointer;
+            border-top: 1px solid #3f86f6;
+        }
+        .taskbar-item:active { background: #153a8e; }
+
+        #clock {
+            margin-left: auto;
+            margin-right: 10px;
+            background: #0c2e8a;
+            padding: 5px 15px;
+            border: 1px solid #3f86f6;
+            border-radius: 2px;
+            color: #fff;
+            font-size: 12px;
+        }
+
+        /* --- 窗口样式 --- */
+        .window {
+            position: absolute;
+            background: #ece9d8;
+            border: 1px solid #0053e1;
+            border-radius: 5px 5px 0 0;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-width: 200px;
+            min-height: 150px;
+        }
+
+        .title-bar {
+            background: linear-gradient(to bottom, #0058ee 0%, #0073eb 4%, #0055ea 100%);
+            height: 30px;
+            display: flex;
+            align-items: center;
+            padding: 0 5px;
+            color: white;
+            font-weight: bold;
+            font-size: 13px;
+            cursor: move;
+            justify-content: space-between;
+        }
+        
+        .title-bar.horror-mode {
+            background: linear-gradient(to bottom, #8a0000 0%, #500000 100%);
+        }
+
+        .window-controls div {
+            width: 20px;
+            height: 20px;
+            border: 1px solid #fff;
+            border-radius: 3px;
+            background: #e04238;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: 2px;
+        }
+
+        .window-content {
+            flex: 1;
+            padding: 2px;
+            position: relative;
+            overflow: auto;
+            background-color: #fff;
+            font-size: 14px;
+        }
+
+        /* --- 具体应用样式 --- */
+        
+        /* 终端 */
+        .terminal { background: #000; color: #0f0; font-family: monospace; padding: 5px; height: 100%; box-sizing: border-box; }
+        .terminal-input { background: transparent; border: none; color: #0f0; outline: none; width: 80%; font-family: monospace; }
+        
+        /* 画图 */
+        .paint-toolbar { background: #ece9d8; padding: 5px; border-bottom: 1px solid #999; display: flex; gap: 5px;}
+        .paint-btn { width: 25px; height: 25px; border: 1px solid #777; cursor: pointer; }
+        canvas { cursor: crosshair; background: #fff; display: block; }
+
+        /* 文件管理器 */
+        .file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 10px; padding: 10px; }
+        .file-item { display: flex; flex-direction: column; align-items: center; cursor: pointer; text-align: center; font-size: 12px; }
+        .file-icon { font-size: 28px; color: #d4a017; }
+
+        /* 蓝屏 */
+        #bsod {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #000082;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            padding: 50px;
+            box-sizing: border-box;
+            z-index: 20000;
+            font-size: 20px;
+        }
+
+        /* 开始菜单 */
+        #start-menu {
+            position: absolute;
+            bottom: 30px;
+            left: 0;
+            width: 250px;
+            background: white;
+            border: 2px solid #245edb;
+            border-radius: 5px 5px 0 0;
+            display: none;
+            z-index: 4999;
+            box-shadow: 2px -2px 5px rgba(0,0,0,0.3);
+        }
+        .start-header {
+            background: linear-gradient(to bottom, #245edb 0%, #0139b5 100%);
+            padding: 10px;
+            color: white;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+        }
+        .user-avatar { width: 30px; height: 30px; border: 2px solid white; border-radius: 3px; margin-right: 10px; background: #8a0000; }
+        .start-body { padding: 5px; background: #fff; }
+        .start-item { padding: 8px; display: flex; align-items: center; cursor: pointer; font-size: 12px; }
+        .start-item:hover { background: #2f71cd; color: white; }
+        .start-item span { margin-right: 10px; font-size: 18px; }
+
+        /* 视频编辑器 */
+        .timeline { height: 40px; background: #ddd; border: 1px solid #999; margin-top: 5px; display: flex; }
+        .timeline-block { width: 50px; height: 100%; background: #0053e1; margin-right: 2px; border: 1px solid #fff; }
+        .video-preview { width: 100%; height: 200px; background: #000; display: flex; align-items: center; justify-content: center; color: red; }
+        
+    </style>
+</head>
+<body>
+
+    <!-- 屏幕滤镜 -->
+    <div id="screen-overlay"></div>
+
+    <!-- 蓝屏死机 -->
+    <div id="bsod">
+        <p>A problem has been detected and Windows has been shut down to prevent damage to your soul.</p>
+        <p>CURSE_LEVEL_CRITICAL</p>
+        <br>
+        <p>If this is the first time you've seen this Stop error screen, pray.</p>
+        <p>Technical Information:</p>
+        <p>*** STOP: 0x00000666 (0xDEADDEAD, 0xBAADF00D, 0x00000000)</p>
+        <br>
+        <p>Beginning dump of physical memory...</p>
+    </div>
+
+    <!-- 开机画面 -->
+    <div id="boot-screen">
+        <div id="boot-logo">Microsoft <span style="font-style:italic">Windows</span> <span style="color:#fff; background:#ff4400; padding:0 5px; border-radius:3px; font-size:20px; vertical-align: middle;">XP Horror</span></div>
+        <div id="loading-bar-container"><div id="loading-bar"></div></div>
+        <div style="margin-top: 20px; color: #555; font-size: 12px;">Copyright © 1985-2025 Microsoft Corp. All rights reserved.</div>
+        <div style="margin-top: 50px; color: #8a0000; font-size: 14px; animation: flicker 0.5s infinite;">点击屏幕以启动系统</div>
+    </div>
+
+    <!-- 桌面 -->
+    <div id="desktop">
+        <!-- 图标由 JS 生成 -->
+    </div>
+
+    <!-- 任务栏 -->
+    <div id="taskbar">
+        <div id="start-btn">🕷 开始</div>
+        <div id="taskbar-apps" style="display: flex;"></div>
+        <div id="clock">00:00 AM</div>
+    </div>
+
+    <!-- 开始菜单 -->
+    <div id="start-menu">
+        <div class="start-header">
+            <div class="user-avatar"></div>
+            <div>Administrator</div>
+        </div>
+        <div class="start-body">
+            <div class="start-item" onclick="openApp('notepad')"><span>📝</span> 记事本</div>
+            <div class="start-item" onclick="openApp('paint')"><span>🎨</span> 画图</div>
+            <div class="start-item" onclick="openApp('cmd')"><span>💻</span> 命令提示符 (Python)</div>
+            <div class="start-item" onclick="openApp('explorer')"><span>📂</span> 我的电脑</div>
+            <div class="start-item" onclick="openApp('game')"><span>💣</span> 扫雷 (受诅咒版)</div>
+            <div class="start-item" onclick="openApp('video')"><span>🎬</span> Movie Maker</div>
+            <div style="height: 1px; background: #ccc; margin: 5px 0;"></div>
+            <div class="start-item" onclick="triggerBSOD()"><span>🔌</span> 关机</div>
+        </div>
+    </div>
+
+<script>
+    /* --- 系统核心逻辑 --- */
+    let zIndexCounter = 100;
+    let bootStarted = false;
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // 应用程序定义
+    const apps = {
+        'notepad': {
+            title: '无题 - 记事本',
+            icon: '📝',
+            content: `<textarea class="notepad-area" style="width:100%; height:100%; border:none; resize:none; font-family: 'Consolas'; padding: 5px; outline:none;"></textarea>`,
+            init: (win) => {
+                const ta = win.querySelector('textarea');
+                const creepyPhrases = ["救我", "它在看你", "不要回头", "系统错误", "666", "血", "die"];
+                ta.addEventListener('input', () => {
+                    if(Math.random() > 0.8) {
+                        const phrase = creepyPhrases[Math.floor(Math.random() * creepyPhrases.length)];
+                        ta.value += phrase;
+                        playTone(100, 'sawtooth', 0.1);
+                    }
+                });
+            }
+        },
+        'cmd': {
+            title: 'C:\\WINDOWS\\System32\\cmd.exe - Python 2.7 (Cursed)',
+            icon: '💻',
+            content: `<div class="terminal" id="term-output">Microsoft Windows XP [版本 5.1.2600]<br>(C) 版权所有 1985-2001 Microsoft Corp.<br><br>Python 2.7.0 (default, Oct 31 2024, 00:00:00) [MSC v.1500 32 bit (Intel)] on win32<br>Type "help", "copyright", "credits" or "license" for more information.<br><br><span id="term-history"></span>>>> <input type="text" class="terminal-input" autofocus></div>`,
+            init: (win) => {
+                const input = win.querySelector('input');
+                const history = win.querySelector('#term-history');
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        const cmd = input.value;
+                        history.innerHTML += `>>> ${cmd}<br>`;
+                        let response = "";
+                        try {
+                            // 简单的伪 Python 解析
+                            if (cmd.startsWith("print")) {
+                                response = cmd.match(/print\s*["'](.*)["']/)[1];
+                            } else if (cmd === "exit()") {
+                                win.remove();
+                                return;
+                            } else if (cmd === "help()") {
+                                response = "Commands: print(), exit(), run_curse(), scan_ghosts()";
+                            } else if (cmd === "run_curse()") {
+                                document.body.style.filter = "invert(1)";
+                                setTimeout(() => document.body.style.filter = "none", 200);
+                                response = "Curse casted.";
+                                playSound('glitch');
+                            } else {
+                                // 危险操作：模拟 Python 计算，使用 JS eval
+                                response = eval(cmd); 
+                            }
+                        } catch (err) {
+                            response = "Traceback (most recent call last):<br>File '<stdin>', line 1, in <module><br>NameError: name '" + cmd + "' is not defined (or evil)";
+                        }
+                        if (response !== undefined) history.innerHTML += `${response}<br>`;
+                        input.value = "";
+                        input.scrollIntoView();
+                    }
+                });
+                win.querySelector('.terminal').onclick = () => input.focus();
+            }
+        },
+        'paint': {
+            title: '画图 - 未命名',
+            icon: '🎨',
+            content: `
+                <div style="display:flex; flex-direction:column; height:100%;">
+                    <div class="paint-toolbar">
+                        <div class="paint-btn" style="background:black" onclick="this.dataset.color='black'"></div>
+                        <div class="paint-btn" style="background:#8a0000" onclick="this.dataset.color='#8a0000'"></div>
+                        <div class="paint-btn" style="background:white" onclick="this.dataset.color='white'"></div>
+                    </div>
+                    <canvas width="600" height="400"></canvas>
+                </div>`,
+            init: (win) => {
+                const canvas = win.querySelector('canvas');
+                const ctx = canvas.getContext('2d');
+                let painting = false;
+                ctx.strokeStyle = "#8a0000";
+                ctx.lineWidth = 2;
+                
+                // 预先画一些恐怖的东西
+                ctx.fillStyle = "white";
+                ctx.fillRect(0,0,600,400);
+                ctx.font = "30px Arial";
+                ctx.fillStyle = "#fee";
+                ctx.fillText("HELP ME", 200, 200);
+
+                canvas.addEventListener('mousedown', () => painting = true);
+                canvas.addEventListener('mouseup', () => painting = false);
+                canvas.addEventListener('mousemove', (e) => {
+                    if(!painting) return;
+                    const rect = canvas.getBoundingClientRect();
+                    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+                    
+                    // 随机滴血效果
+                    if(Math.random() > 0.95) {
+                        ctx.fillStyle = "#8a0000";
+                        ctx.beginPath();
+                        ctx.arc(e.clientX - rect.left, e.clientY - rect.top + Math.random()*20, Math.random()*3, 0, Math.PI*2);
+                        ctx.fill();
+                    }
+                });
+                win.querySelectorAll('.paint-btn').forEach(b => {
+                    b.addEventListener('click', (e) => {
+                        ctx.strokeStyle = e.target.dataset.color || '#8a0000';
+                        ctx.beginPath();
+                    });
+                });
+            }
+        },
+        'explorer': {
+            title: '我的电脑',
+            icon: '💻',
+            content: `
+                <div style="display:flex; height:100%;">
+                    <div style="width:100px; background:#fff; border-right:1px solid #ccc; padding:5px;">
+                        <div>桌面</div>
+                        <div>我的文档</div>
+                        <div style="color:red">回收站(满)</div>
+                    </div>
+                    <div class="file-grid" style="flex:1; background:#fff;">
+                        <div class="file-item" onclick="alert('无法访问：权限不足或灵魂已丢失')"><span class="file-icon">📁</span><span>系统文件</span></div>
+                        <div class="file-item" onclick="openApp('notepad')"><span class="file-icon">📄</span><span>遗书.txt</span></div>
+                        <div class="file-item" onclick="triggerBSOD()"><span class="file-icon">⚙️</span><span>DO_NOT_RUN.exe</span></div>
+                        <div class="file-item"><span class="file-icon">📷</span><span>看着你.jpg</span></div>
+                    </div>
+                </div>
+            `
+        },
+        'game': {
+            title: '扫雷',
+            icon: '💣',
+            content: `<div id="minesweeper" style="padding:10px; background:#c0c0c0; text-align:center;"></div>`,
+            init: (win) => {
+                const container = win.querySelector('#minesweeper');
+                let html = '<div style="display:grid; grid-template-columns:repeat(8, 20px); gap:1px; background:#808080; border:2px solid #808080;">';
+                for(let i=0; i<64; i++) {
+                    html += `<div class="cell" data-id="${i}" style="width:20px; height:20px; background:#c0c0c0; border:1px outset #fff; cursor:pointer; font-size:12px; line-height:20px;"></div>`;
+                }
+                html += '</div>';
+                container.innerHTML = html;
+                
+                container.querySelectorAll('.cell').forEach(cell => {
+                    cell.addEventListener('click', function() {
+                        if(Math.random() > 0.8) {
+                            this.style.background = 'red';
+                            this.innerHTML = '☠️';
+                            playSound('scream');
+                            setTimeout(() => alert("GAME OVER: 你死了"), 100);
+                        } else {
+                            this.style.background = '#c0c0c0';
+                            this.style.border = '1px solid #888';
+                            this.innerHTML = Math.floor(Math.random()*3) + 1;
+                        }
+                    });
+                });
+            }
+        },
+        'video': {
+            title: 'Windows Movie Maker',
+            icon: '🎬',
+            content: `
+                <div style="display:flex; flex-direction:column; height:100%; background:#eee;">
+                    <div class="video-preview" id="vid-prev">NO SIGNAL</div>
+                    <div style="padding:5px; flex:1;">
+                        <button onclick="playVideo()">播放时间线</button>
+                        <div class="timeline">
+                            <div class="timeline-block"></div>
+                            <div class="timeline-block"></div>
+                            <div class="timeline-block" style="background:red"></div>
+                        </div>
+                        <div>在这里拖动媒体剪辑...</div>
+                    </div>
+                </div>
+            `,
+            init: (win) => {
+                win.playVideo = () => {
+                    const prev = win.querySelector('#vid-prev');
+                    prev.innerHTML = "";
+                    let frames = 0;
+                    const interval = setInterval(() => {
+                        prev.style.backgroundColor = Math.random() > 0.5 ? "black" : "white";
+                        frames++;
+                        if(frames % 5 === 0) playTone(50 + Math.random()*100, 'square', 0.05);
+                        if(frames > 20) {
+                            clearInterval(interval);
+                            prev.style.backgroundColor = "black";
+                            prev.innerHTML = "<span style='color:red; font-size:40px;'>RUN</span>";
+                            playSound('scream');
+                        }
+                    }, 100);
+                }
+            }
+        }
+    };
+
+    // 初始化图标
+    const desktop = document.getElementById('desktop');
+    const defaultIcons = [
+        { name: '我的电脑', app: 'explorer', icon: '💻' },
+        { name: '回收站', app: 'explorer', icon: '🗑️' },
+        { name: '记事本', app: 'notepad', icon: '📝' },
+        { name: 'Internet Explorer', app: 'bsod', icon: '🌐' }, // IE会崩溃
+        { name: 'DOOM', app: 'game', icon: '💀' }
+    ];
+
+    defaultIcons.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'desktop-icon';
+        div.innerHTML = `<div class="icon-img">${item.icon}</div><div>${item.name}</div>`;
+        div.onclick = () => {
+            if(item.app === 'bsod') triggerBSOD();
+            else openApp(item.app);
+        };
+        desktop.appendChild(div);
+    });
+
+    // 窗口管理器
+    function openApp(appId) {
+        if(!apps[appId]) return;
+        const app = apps[appId];
+        
+        const win = document.createElement('div');
+        win.className = 'window';
+        win.style.left = (50 + Math.random() * 100) + 'px';
+        win.style.top = (50 + Math.random() * 100) + 'px';
+        win.style.width = '400px';
+        win.style.height = '300px';
+        win.style.zIndex = ++zIndexCounter;
+        
+        // 偶尔让窗口变成“恐怖模式”
+        const isCursed = Math.random() > 0.8;
+        const titleClass = isCursed ? 'title-bar horror-mode' : 'title-bar';
+
+        win.innerHTML = `
+            <div class="${titleClass}">
+                <div style="display:flex;align-items:center"><span style="margin-right:5px">${app.icon}</span> ${app.title}</div>
+                <div class="window-controls">
+                    <div onclick="this.closest('.window').style.display='none'">_</div>
+                    <div onclick="this.closest('.window').classList.toggle('maximized')">□</div>
+                    <div onclick="this.closest('.window').remove()">X</div>
+                </div>
+            </div>
+            <div class="window-content">${app.content}</div>
+        `;
+
+        document.body.appendChild(win);
+        makeDraggable(win);
+        
+        // 任务栏项
+        const taskItem = document.createElement('div');
+        taskItem.className = 'taskbar-item';
+        taskItem.innerHTML = `${app.icon} ${app.title.substring(0, 10)}...`;
+        taskItem.onclick = () => {
+            win.style.display = 'flex';
+            win.style.zIndex = ++zIndexCounter;
+        };
+        document.getElementById('taskbar-apps').appendChild(taskItem);
+
+        // 窗口关闭时移除任务栏项
+        const closeBtn = win.querySelector('.window-controls div:last-child');
+        const originalRemove = closeBtn.onclick;
+        closeBtn.onclick = () => {
+            taskItem.remove();
+            win.remove();
+        };
+        
+        // 窗口点击置顶
+        win.addEventListener('mousedown', () => win.style.zIndex = ++zIndexCounter);
+
+        if(app.init) app.init(win);
+        if(isCursed) playTone(50, 'sawtooth', 0.5);
+    }
+
+    function makeDraggable(elmnt) {
+        let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+        const header = elmnt.querySelector(".title-bar");
+        if (header) {
+            header.onmousedown = dragMouseDown;
+        }
+
+        function dragMouseDown(e) {
+            e = e || window.event;
+            e.preventDefault();
+            pos3 = e.clientX;
+            pos4 = e.clientY;
+            document.onmouseup = closeDragElement;
+            document.onmousemove = elementDrag;
+            elmnt.style.zIndex = ++zIndexCounter;
+        }
+
+        function elementDrag(e) {
+            e = e || window.event;
+            e.preventDefault();
+            pos1 = pos3 - e.clientX;
+            pos2 = pos4 - e.clientY;
+            pos3 = e.clientX;
+            pos4 = e.clientY;
+            elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
+            elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
+        }
+
+        function closeDragElement() {
+            document.onmouseup = null;
+            document.onmousemove = null;
+        }
+    }
+
+    // 开始菜单
+    const startBtn = document.getElementById('start-btn');
+    const startMenu = document.getElementById('start-menu');
+    startBtn.onclick = (e) => {
+        e.stopPropagation();
+        startMenu.style.display = startMenu.style.display === 'block' ? 'none' : 'block';
+    };
+    document.body.onclick = (e) => {
+        if(!startMenu.contains(e.target) && e.target !== startBtn) {
+            startMenu.style.display = 'none';
+        }
+        // 开机逻辑
+        if(!bootStarted) {
+            bootStarted = true;
+            bootSequence();
+        }
+    };
+
+    // 时钟
+    setInterval(() => {
+        const now = new Date();
+        let hours = now.getHours();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        const minutes = now.getMinutes().toString().padStart(2, '0');
+        document.getElementById('clock').innerText = `${hours}:${minutes} ${ampm}`;
+        
+        // 随机恐怖事件
+        if(Math.random() > 0.99) {
+            document.getElementById('clock').innerText = "66:66 DIE";
+            playSound('glitch');
+        }
+    }, 1000);
+
+    // 蓝屏逻辑
+    function triggerBSOD() {
+        document.getElementById('bsod').style.display = 'block';
+        playSound('drone');
+        setTimeout(() => location.reload(), 5000); // 5秒后重启
+    }
+
+    // --- 音频引擎 (Web Audio API) ---
+    
+    function bootSequence() {
+        // 模拟 XP 开机声，但很诡异
+        const now = audioCtx.currentTime;
+        // 和弦: Eb Maj (distorted)
+        playTone(311.13, 'square', 1, 0); // Eb4
+        playTone(392.00, 'sawtooth', 1, 0.2); // G4
+        playTone(466.16, 'square', 1, 0.4); // Bb4
+        playTone(622.25, 'sine', 2, 0.6); // Eb5
+        
+        // 进度条动画
+        const bar = document.getElementById('loading-bar');
+        bar.style.width = '100%';
+        
+        setTimeout(() => {
+            document.getElementById('boot-screen').style.opacity = 0;
+            setTimeout(() => document.getElementById('boot-screen').style.display = 'none', 1000);
+            playAmbience();
+        }, 3000);
+    }
+
+    function playTone(freq, type, duration, delay=0) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        
+        // 随机失谐
+        osc.detune.value = Math.random() * 50 - 25;
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        const now = audioCtx.currentTime + delay;
+        osc.start(now);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+        osc.stop(now + duration);
+    }
+
+    function playSound(type) {
+        if(type === 'glitch') {
+            playTone(100 + Math.random()*1000, 'sawtooth', 0.1);
+            playTone(50, 'square', 0.1);
+        } else if (type === 'scream') {
+            playTone(800, 'sawtooth', 0.5);
+            playTone(850, 'sawtooth', 0.5, 0.1);
+            playTone(900, 'sawtooth', 0.5, 0.2);
+        } else if (type === 'drone') {
+            playTone(55, 'sawtooth', 5);
+        }
+    }
+
+    function playAmbience() {
+        // 持续的低频噪音
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = 40; // 低频嗡嗡声
+        gain.gain.value = 0.02;
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+    }
+
+</script>
+</body>
+</html>
